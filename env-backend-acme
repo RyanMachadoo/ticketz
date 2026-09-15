@@ -1,0 +1,45 @@
+# ===================== DOMÍNIO / SSL =====================
+FRONTEND_HOST=comunica.francautolabs.com.br
+EMAIL_ADDRESS=desenvolvimento@francauto.com.br
+TZ=America/Sao_Paulo
+
+# ===================== INTERNO (não precisa mexer) =====================
+# O backend fica sob /backend do mesmo domínio (não em apicomunica).
+BACKEND_PATH=/backend
+
+RECAPTCHA_SECRET_KEY=
+
+BACKEND_URL=https://${FRONTEND_HOST}${BACKEND_PATH}
+FRONTEND_URL=https://${FRONTEND_HOST}
+
+DB_DIALECT=postgres
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=comunica
+DB_NAME=comunica
+DB_TIMEZONE=-03:00
+
+REDIS_URI=redis://redis:6379
+REDIS_OPT_LIMITER_MAX=1
+REDIS_OPT_LIMITER_DURATION=3000
+
+USER_LIMIT=10000
+CONNECTIONS_LIMIT=100000
+CLOSED_SEND_BY_ME=true
+
+FACEBOOK_APP_ID=
+FACEBOOK_APP_SECRET=
+VERIFY_TOKEN=ticketz
+SOCKET_ADMIN=true
+
+# ===================== EVOHUB (canal WhatsApp OFICIAL) =====================
+# Token que VOCÊ cadastra no webhook do painel do EvoHub. O backend valida
+# cada POST contra este valor. Gere um token forte e use o MESMO na URL do webhook.
+
+EVOHUB_WEBHOOK_TOKEN=1a7051633ee5cd5992b55058dcd52a33244fffa4cd30bb4c6b625785fb54ee38
+
+# Verify token do handshake GET (só usado se o EvoHub repassar o verify da Meta).
+EVOHUB_VERIFY_TOKEN=1a7051633ee5cd5992b55058dcd52a33244fffa4cd30bb4c6b625785fb54ee38
+
+# OBS: URL base, token do CANAL, phone_number_id e waba_id NÃO ficam aqui.
+# São por conexão, gravados no banco (tabela Whatsapps) ao criar o canal oficial.

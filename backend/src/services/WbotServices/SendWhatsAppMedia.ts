@@ -19,6 +19,9 @@ import saveMediaToFile from "../../helpers/saveMediaFile";
 import { getJidOf } from "./getJidOf";
 import { logger } from "../../utils/logger";
 import { URLCharEncoder } from "../../helpers/URLCharEncoder";
+import Whatsapp from "../../models/Whatsapp";
+import * as EvoHubProvider from "../EvoHubServices/EvoHubProvider";
+import CreateMessageService from "../MessageServices/CreateMessageService";
 
 interface Request {
   media: Express.Multer.File;
@@ -155,6 +158,93 @@ export const SendWhatsAppMessage = async (
   }
 };
 
+// ===================== Canal WhatsApp OFICIAL (EvoHub) =====================
+
+/** Mapeia o mimetype pro tipo de mídia aceito pela Cloud API. */
+function evoHubMediaKind(
+  mimetype: string
+): "image" | "video" | "audio" | "document" {
+  if (mimetype === "image/jpeg" || mimetype === "image/png") return "image";
+  if (mimetype.startsWith("video/")) return "video";
+  if (mimetype.startsWith("audio/")) return "audio";
+  // webp, pdf, docx, xlsx etc. vão como documento.
+  return "document";
+}
+
+/** Persiste a mensagem enviada (não há echo do Baileys nesse canal). */
+async function persistOutgoingEvoHub(
+  ticket: Ticket,
+  wamid: string,
+  body: string,
+  mediaType: string,
+  mediaUrl?: string
+): Promise<void> {
+  await CreateMessageService({
+    messageData: {
+      id: wamid,
+      ticketId: ticket.id,
+      contactId: ticket.contactId,
+      body,
+      fromMe: true,
+      read: true,
+      mediaType,
+      mediaUrl,
+      ack: 1,
+      channel: "whatsapp_oficial"
+    },
+    companyId: ticket.companyId
+  });
+  await ticket.update({ lastMessage: body || `[${mediaType}]` });
+}
+
+async function sendMediaViaEvoHub(
+  connection: Whatsapp,
+  ticket: Ticket,
+  info: {
+    pathMedia: string;
+    mimetype: string;
+    fileName: string;
+    caption?: string;
+    savedPath: string;
+    size: number;
+    fileLimit: number;
+  }
+): Promise<WAMessage> {
+  const { pathMedia, mimetype, fileName, caption, savedPath, size, fileLimit } =
+    info;
+  const to = ticket.contact.number;
+
+  // Arquivo acima do limite: manda link por texto (mesmo comportamento do Baileys).
+  if (size > fileLimit * 1024 * 1024) {
+    const fileUrl = savedPath.startsWith("http")
+      ? savedPath
+      : `${process.env.BACKEND_URL}/public/${savedPath}`;
+    const { wamid } = await EvoHubProvider.sendText(
+      connection,
+      to,
+      `📎 *${fileName}*\n\n🔗 ${URLCharEncoder(fileUrl)}`
+    );
+    await persistOutgoingEvoHub(ticket, wamid, `📎 ${fileName}`, "chat", savedPath);
+    return { key: { id: wamid } } as unknown as WAMessage;
+  }
+
+  // Fluxo normal da Cloud API: 2 passos (upload -> envia referenciando o media_id).
+  const kind = evoHubMediaKind(mimetype);
+  const mediaId = await EvoHubProvider.uploadMedia(connection, pathMedia, mimetype);
+  const { wamid } = await EvoHubProvider.sendMediaById(
+    connection,
+    to,
+    mediaId,
+    kind,
+    caption,
+    kind === "document" ? fileName : undefined
+  );
+  await persistOutgoingEvoHub(ticket, wamid, caption || "", kind, savedPath);
+  return { key: { id: wamid } } as unknown as WAMessage;
+}
+
+// ===========================================================================
+
 export const SendWhatsAppMedia = async ({
   media,
   ticket,
@@ -197,6 +287,21 @@ export const SendWhatsAppMedia = async ({
       filename: fileName || media.originalname
     };
 
+    // ===== Canal WhatsApp OFICIAL (EvoHub) =====
+    const connection = await Whatsapp.findByPk(ticket.whatsappId);
+    if (connection && connection.channel === "whatsapp_oficial") {
+      return sendMediaViaEvoHub(connection, ticket, {
+        pathMedia,
+        mimetype: media.mimetype,
+        fileName: fileName || media.originalname,
+        caption,
+        savedPath,
+        size: media.size,
+        fileLimit
+      });
+    }
+
+    // ===== Canal Baileys (fluxo original) =====
     if (media.size > fileLimit * 1024 * 1024) {
       const fileUrl = savedPath.startsWith("http")
         ? savedPath

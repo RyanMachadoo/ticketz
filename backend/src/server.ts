@@ -5,6 +5,7 @@ import { logger } from "./utils/logger";
 import { StartAllWhatsAppsSessions } from "./services/WbotServices/StartAllWhatsAppsSessions";
 import Company from "./models/Company";
 import { startQueueProcess, closeAllQueues } from "./queues";
+import { evoHubInboundQueue } from "./queues/EvoHubInboundQueue";
 import { closeAllSessions } from "./libs/wbot";
 import {
   checkOpenInvoices,
@@ -98,7 +99,11 @@ i18nReady.then(() => {
     onShutdown: async () => {
       // Close WhatsApp sessions (without logout, so credentials are kept)
       // and drain Bull queues so in-flight jobs can finish.
-      await Promise.allSettled([closeAllSessions(), closeAllQueues()]);
+      await Promise.allSettled([
+        closeAllSessions(),
+        closeAllQueues(),
+        evoHubInboundQueue.close()
+      ]);
     },
     finally: () => {
       if (forceExitTimer) {

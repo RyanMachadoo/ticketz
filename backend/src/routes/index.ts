@@ -34,12 +34,14 @@ import ticketzOSSRoutes from "./ticketzOSSRoutes";
 import i18nRoutes from "./i18nRoutes";
 import wavoipRoutes from "./wavoipRoutes";
 import dockerRoutes from "./dockerRoutes";
+import evoHubRoutes from "./evoHubRoutes";
 
 const routes = Router();
 
 routes.use(userRoutes);
 routes.use("/auth", authRoutes);
 routes.use(settingRoutes);
+routes.use(evoHubRoutes);
 routes.use(contactRoutes);
 routes.use(ticketRoutes);
 routes.use(buildCaptureExtensionRoutes);

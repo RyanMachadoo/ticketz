@@ -129,6 +129,21 @@ class Whatsapp extends Model<Whatsapp> {
 
   @Column(DataType.TEXT)
   channel: string;
+
+  // ===== EvoHub (canal WhatsApp oficial) =====
+  // Preenchidos quando channel === "whatsapp_oficial".
+  // O token é segredo — nunca logar.
+  @Column(DataType.TEXT)
+  evohubBaseUrl: string;
+
+  @Column(DataType.TEXT)
+  evohubToken: string;
+
+  @Column(DataType.TEXT)
+  evohubPhoneNumberId: string;
+
+  @Column(DataType.TEXT)
+  evohubWabaId: string;
 }
 
 export default Whatsapp;
