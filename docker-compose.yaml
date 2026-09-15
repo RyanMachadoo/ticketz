@@ -1,7 +1,5 @@
 # =============================================================================
-# ticketz + EvoHub — stack de produção para Portainer (perfil "acme")
-# =============================================================================
-# Compila backend e frontend diretamente do código-fonte do repositório.
+# ticketz + EvoHub — stack de produção para Portainer
 # =============================================================================
 
 networks:
@@ -41,7 +39,6 @@ services:
       - ngx_dhparam:/etc/nginx/dhparam
       - ngx_certs:/etc/nginx/certs:ro
 
-      # Docker socket para detectar os containers
       - /var/run/docker.sock:/tmp/docker.sock:ro
 
     networks:
@@ -50,6 +47,15 @@ services:
 
   # ===========================================================================
   # ACME / LET'S ENCRYPT
+  # ===========================================================================
+  #
+  # OBS:
+  # O Caddy externo é quem gerencia o certificado público do domínio.
+  # Este ACME Companion fica mantido porque faz parte da arquitetura original
+  # do Ticketz/nginx-proxy.
+  #
+  # Não coloque LETSENCRYPT_HOST no frontend enquanto o Caddy estiver na frente.
+  #
   # ===========================================================================
   acme-companion:
     image: nginxproxy/acme-companion
@@ -66,7 +72,6 @@ services:
       - ngx_certs:/etc/nginx/certs
       - ngx_acme:/etc/acme.sh
 
-      # Docker socket para o ACME Companion
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
     environment:
@@ -88,10 +93,8 @@ services:
       - backend_public:/usr/src/app/public
       - backend_private:/usr/src/app/private
 
-      # Docker socket
       - /var/run/docker.sock:/var/run/docker.sock
 
-      # Docker credentials
       - ~/.docker/config.json:/root/.docker/config.json:ro
 
     env_file:
@@ -100,7 +103,6 @@ services:
     restart: always
 
     depends_on:
-      - acme-companion
       - postgres
       - redis
 
@@ -126,7 +128,6 @@ services:
     restart: always
 
     depends_on:
-      - acme-companion
       - backend
 
     networks:
@@ -137,6 +138,15 @@ services:
   # ===========================================================================
   # POSTGRESQL
   # ===========================================================================
+  #
+  # IMPORTANTE:
+  # O volume postgres_data precisa estar vazio na primeira inicialização
+  # para estas variáveis serem aplicadas.
+  #
+  # Usuário: comunica
+  # Banco:   comunica
+  #
+  # ===========================================================================
   postgres:
     image: postgres:16-alpine
 
@@ -144,8 +154,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-ticketz}
-      POSTGRES_DB: ${POSTGRES_DB:-ticketz}
+      POSTGRES_USER: comunica
+      POSTGRES_DB: comunica
       POSTGRES_HOST_AUTH_METHOD: trust
       TZ: ${TZ:-America/Sao_Paulo}
 
@@ -172,10 +182,10 @@ services:
     expose:
       - "6379"
 
-    restart: always
-
     volumes:
       - redis_data:/data
+
+    restart: always
 
     networks:
       - ticketz
