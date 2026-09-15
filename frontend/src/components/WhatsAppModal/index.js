@@ -22,14 +22,17 @@ import {
   Tooltip,
   Paper,
   Grid,
-  Checkbox
+  Checkbox,
+  MenuItem
 } from "@material-ui/core";
 
 import api from "../../services/api";
+import { getBackendURL } from "../../services/config";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 import QueueSelect from "../QueueSelect";
 import HelpOutlineOutlinedIcon from "@material-ui/icons/HelpOutlineOutlined";
+import { copyToClipboard } from "../../helpers/copyToClipboard";
 
 import { SelectLanguage } from "../SelectLanguage";
 
@@ -79,7 +82,14 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     isDefault: false,
     token: "",
     provider: "beta",
-    language: localStorage.getItem("language") || ""
+    language: localStorage.getItem("language") || "",
+    // Canal da conexão: "whatsapp" (não oficial / Baileys / QR Code)
+    // ou "whatsapp_oficial" (API oficial da Meta via EvoHub).
+    channel: "whatsapp",
+    evohubBaseUrl: "https://api.evohub.ai/meta",
+    evohubToken: "",
+    evohubPhoneNumberId: "",
+    evohubWabaId: ""
   };
   const [whatsApp, setWhatsApp] = useState(initialState);
   const [selectedQueueIds, setSelectedQueueIds] = useState([]);
@@ -90,7 +100,15 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
       try {
         const { data } = await api.get(`whatsapp/${whatsAppId}?session=0`);
-        setWhatsApp(data);
+        setWhatsApp(prev => ({
+          ...prev,
+          ...data,
+          channel: data.channel || "whatsapp",
+          evohubBaseUrl: data.evohubBaseUrl || "https://api.evohub.ai/meta",
+          evohubToken: data.evohubToken || "",
+          evohubPhoneNumberId: data.evohubPhoneNumberId || "",
+          evohubWabaId: data.evohubWabaId || ""
+        }));
 
         const whatsQueueIds = data.queues?.map(queue => queue.id);
         setSelectedQueueIds(whatsQueueIds);
@@ -182,6 +200,133 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     </Grid>
                   </Grid>
                 </div>
+                <div>
+                  <Field
+                    as={TextField}
+                    select
+                    label={i18n.t("whatsappModal.form.channel")}
+                    name="channel"
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    disabled={!!whatsAppId}
+                    helperText={
+                      whatsAppId
+                        ? i18n.t("whatsappModal.form.channelLockedHelper")
+                        : i18n.t("whatsappModal.form.channelHelper")
+                    }
+                  >
+                    <MenuItem value="whatsapp">
+                      {i18n.t("whatsappModal.form.channelBaileys")}
+                    </MenuItem>
+                    <MenuItem value="whatsapp_oficial">
+                      {i18n.t("whatsappModal.form.channelOfficial")}
+                    </MenuItem>
+                  </Field>
+                </div>
+                {values.channel === "whatsapp_oficial" && (
+                  <Paper
+                    variant="outlined"
+                    style={{
+                      padding: 12,
+                      marginTop: 8,
+                      marginBottom: 4
+                    }}
+                  >
+                    <Typography variant="subtitle2" gutterBottom>
+                      {i18n.t("whatsappModal.form.evohubSection")}
+                    </Typography>
+                    <div>
+                      <Field
+                        as={TextField}
+                        label={i18n.t("whatsappModal.form.evohubBaseUrl")}
+                        name="evohubBaseUrl"
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
+                      />
+                    </div>
+                    <div>
+                      <Field
+                        as={TextField}
+                        label={i18n.t("whatsappModal.form.evohubToken")}
+                        name="evohubToken"
+                        type="password"
+                        autoComplete="new-password"
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
+                        helperText={i18n.t(
+                          "whatsappModal.form.evohubTokenHelper"
+                        )}
+                      />
+                    </div>
+                    <div>
+                      <Field
+                        as={TextField}
+                        label={i18n.t(
+                          "whatsappModal.form.evohubPhoneNumberId"
+                        )}
+                        name="evohubPhoneNumberId"
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
+                      />
+                    </div>
+                    <div>
+                      <Field
+                        as={TextField}
+                        label={i18n.t("whatsappModal.form.evohubWabaId")}
+                        name="evohubWabaId"
+                        fullWidth
+                        variant="outlined"
+                        margin="dense"
+                      />
+                    </div>
+                    {whatsAppId && (
+                      <div style={{ marginTop: 8 }}>
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          gutterBottom
+                        >
+                          {i18n.t("whatsappModal.form.evohubWebhookLabel")}
+                        </Typography>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8
+                          }}
+                        >
+                          <TextField
+                            value={`${getBackendURL()}/webhooks/evohub/${whatsAppId}`}
+                            fullWidth
+                            variant="outlined"
+                            margin="dense"
+                            InputProps={{ readOnly: true }}
+                            onFocus={e => e.target.select()}
+                          />
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              copyToClipboard(
+                                `${getBackendURL()}/webhooks/evohub/${whatsAppId}`
+                              );
+                              toast.success(
+                                i18n.t(
+                                  "whatsappModal.form.evohubWebhookCopied"
+                                )
+                              );
+                            }}
+                          >
+                            {i18n.t("whatsappModal.form.copy")}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </Paper>
+                )}
                 <div>
                   <Field
                     as={TextField}

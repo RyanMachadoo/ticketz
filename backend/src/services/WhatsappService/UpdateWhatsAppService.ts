@@ -20,6 +20,12 @@ export interface WhatsappData {
   companyId?: number;
   token?: string;
   language?: string;
+  channel?: string;
+  // ===== EvoHub (canal WhatsApp oficial) =====
+  evohubBaseUrl?: string;
+  evohubToken?: string;
+  evohubPhoneNumberId?: string;
+  evohubWabaId?: string;
 }
 
 interface Request {
@@ -56,7 +62,11 @@ const UpdateWhatsAppService = async ({
     transferMessage,
     queueIds,
     token,
-    language
+    language,
+    evohubBaseUrl,
+    evohubToken,
+    evohubPhoneNumberId,
+    evohubWabaId
   } = whatsappData;
 
   try {
@@ -102,7 +112,13 @@ const UpdateWhatsAppService = async ({
     companyId,
     token,
     transferMessage,
-    language
+    language,
+    // Config do canal oficial (EvoHub). O channel em si não é alterado aqui:
+    // é definido na criação da conexão.
+    evohubBaseUrl,
+    evohubToken,
+    evohubPhoneNumberId,
+    evohubWabaId
   });
 
   if (queueIds) {

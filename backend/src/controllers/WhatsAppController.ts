@@ -27,6 +27,13 @@ interface WhatsappData {
   status?: string;
   isDefault?: boolean;
   token?: string;
+  channel?: string;
+  provider?: string;
+  // ===== EvoHub (canal WhatsApp oficial) =====
+  evohubBaseUrl?: string;
+  evohubToken?: string;
+  evohubPhoneNumberId?: string;
+  evohubWabaId?: string;
 }
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -52,7 +59,13 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     ratingMessage,
     transferMessage,
     queueIds,
-    token
+    token,
+    channel,
+    provider,
+    evohubBaseUrl,
+    evohubToken,
+    evohubPhoneNumberId,
+    evohubWabaId
   }: WhatsappData = req.body;
   const { companyId } = req.user;
 
@@ -67,7 +80,13 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     transferMessage,
     queueIds,
     companyId,
-    token
+    token,
+    channel,
+    provider,
+    evohubBaseUrl,
+    evohubToken,
+    evohubPhoneNumberId,
+    evohubWabaId
   });
 
   sendWhatsappUpdate(whatsapp);
@@ -76,7 +95,11 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     sendWhatsappUpdate(oldDefaultWhatsapp);
   }
 
-  StartWhatsAppSession(whatsapp, companyId);
+  // O canal oficial (EvoHub) recebe mensagens por webhook e não usa sessão
+  // Baileys — só o canal "whatsapp" (não oficial) precisa iniciar o wbot.
+  if (whatsapp.channel === "whatsapp") {
+    StartWhatsAppSession(whatsapp, companyId);
+  }
 
   return res.status(200).json(whatsapp);
 };

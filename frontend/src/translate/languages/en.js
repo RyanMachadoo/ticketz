@@ -250,7 +250,25 @@ const messages = {
         },
         form: {
           name: "Name",
-          default: "Default"
+          default: "Default",
+          channel: "Channel",
+          channelBaileys: "WhatsApp (unofficial / QR Code)",
+          channelOfficial: "Official WhatsApp (EvoHub)",
+          channelHelper:
+            "Choose the connection type. It can't be changed after creation.",
+          channelLockedHelper:
+            "The channel can't be changed after the connection is created.",
+          evohubSection: "EvoHub configuration (Official WhatsApp)",
+          evohubBaseUrl: "EvoHub base URL",
+          evohubToken: "Channel token (EvoHub)",
+          evohubTokenHelper:
+            "Secret channel token generated in the EvoHub panel.",
+          evohubPhoneNumberId: "Phone Number ID",
+          evohubWabaId: "WABA ID",
+          evohubWebhookLabel:
+            "Webhook URL (register it in the EvoHub panel):",
+          evohubWebhookCopied: "Webhook URL copied.",
+          copy: "Copy"
         },
         buttons: {
           okAdd: "Add",

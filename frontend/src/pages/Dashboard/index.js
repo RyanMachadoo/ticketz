@@ -21,29 +21,19 @@ import { grey, blue } from "@material-ui/core/colors";
 import { toast } from "react-toastify";
 
 import TableAttendantsStatus from "../../components/Dashboard/TableAttendantsStatus";
-import BlogFeedCarousel from "../../components/Dashboard/BlogFeedCarousel";
 
 import { isEmpty } from "lodash";
 import moment from "moment";
 import { i18n } from "../../translate/i18n";
-import OnlyForSuperUser from "../../components/OnlyForSuperUser";
 import useAuth from "../../hooks/useAuth.js";
-import { loadJSON } from "../../helpers/loadJSON";
 
 import { SmallPie } from "./SmallPie";
 import { TicketCountersChart } from "./TicketCountersChart";
 import { getTimezoneOffset } from "../../helpers/getTimezoneOffset.js";
 
-import TicketzRegistry from "../../components/TicketzRegistry";
-import ContainerUpdatesBanner from "../../components/Dashboard/ContainerUpdatesBanner";
-import { copyToClipboard } from "../../helpers/copyToClipboard.js";
 import api from "../../services/api.js";
-import config from "../../services/config.js";
 import { SocketContext } from "../../context/Socket/SocketContext.js";
 import { formatTimeInterval } from "../../helpers/formatTimeInterval.js";
-import TicketzProAd from "../../components/Dashboard/TicketzProAd";
-
-const gitinfo = loadJSON("/gitinfo.json");
 
 const useStyles = makeStyles(theme => ({
   container: {
@@ -275,11 +265,6 @@ const Dashboard = () => {
   );
   const { getCurrentUserInfo } = useAuth();
 
-  const [supportPix, setSupportPix] = useState(false);
-  const [supportIsBr, setSupportIsBr] = useState(false);
-  const [registered, setRegistered] = useState(false);
-  const [proInstructionsOpen, setProInstructionsOpen] = useState(false);
-
   const [usersOnlineTotal, setUsersOnlineTotal] = useState(0);
   const [usersOfflineTotal, setUsersOfflineTotal] = useState(0);
   const [usersStatusChartData, setUsersStatusChartData] = useState([]);
@@ -294,27 +279,6 @@ const Dashboard = () => {
 
   const socketManager = useContext(SocketContext);
   const companyId = localStorage.getItem("companyId");
-
-  async function showProInstructions() {
-    if (gitinfo.commitHash) {
-      setProInstructionsOpen(true);
-      return;
-    }
-
-    window.open("https://pro.ticke.tz", "_blank");
-  }
-
-  useEffect(() => {
-    fetch("https://ipapi.co/json/")
-      .then(res => res.json())
-      .then(data => {
-        if (data.country === "BR") {
-          setSupportPix(true);
-          setSupportIsBr(true);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const socket = socketManager.GetSocket(companyId);
@@ -335,13 +299,6 @@ const Dashboard = () => {
       setCurrentUser(user);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    api.get("/ticketz/registry").then(result => {
-      const registry = result.data;
-      setRegistered(registry?.disabled || !!registry?.whatsapp);
-    });
   }, []);
 
   useEffect(() => {
@@ -550,159 +507,6 @@ const Dashboard = () => {
   return (
     <div>
       <Container maxWidth="lg" className={classes.container}>
-        <OnlyForSuperUser
-          user={currentUser}
-          yes={() => (
-            <>
-              <Grid container spacing={3} justifyContent="flex-start">
-                {config.TZAUTOINSTALLER === "1" && <ContainerUpdatesBanner />}
-                {!localStorage.getItem("hideAds") && (
-                  <>
-                    <Grid item xs={12}>
-                      {!registered && (
-                        <Paper className={classes.ticketzRegistryPaper}>
-                          <TicketzRegistry onRegister={setRegistered} />
-                        </Paper>
-                      )}
-                    </Grid>
-                    <Grid item xs={12}>
-                      <TicketzProAd
-                        classes={classes}
-                        proInstructionsOpen={proInstructionsOpen}
-                        onShowProInstructions={showProInstructions}
-                        hasCommitHash={!!gitinfo.commitHash}
-                      />
-                    </Grid>
-                  </>
-                )}
-              </Grid>
-              <Grid container spacing={3} justifyContent="flex-start">
-                <Grid item xs={12} md={8}>
-                  <BlogFeedCarousel />
-                </Grid>
-
-                {!localStorage.getItem("hideAds") && (
-                  <Grid item xs={12} md={4}>
-                    <Paper className={classes.supportPaper}>
-                      <Typography
-                        style={{ overflow: "hidden" }}
-                        component="h2"
-                        variant="h6"
-                        gutterBottom
-                      >
-                        {i18n.t("ticketz.support.title")}
-                      </Typography>
-                      <Grid container justifyContent="flex-end">
-                        <Grid
-                          className={classes.supportBox}
-                          style={{ maxHeight: supportPix ? 300 : 35 }}
-                          item
-                          xs={12}
-                        >
-                          <Typography
-                            className={classes.clickpointer}
-                            component="h3"
-                            variant="h6"
-                            gutterBottom
-                            onClick={() => setSupportPix(true)}
-                          >
-                            PIX
-                          </Typography>
-                          <div
-                            className={classes.clickpointer}
-                            onClick={() => {
-                              copyToClipboard(
-                                "1ab11506-9480-4303-8e1e-988e7c49ed4d"
-                              );
-                              toast.success("Chave PIX copiada");
-                            }}
-                          >
-                            <div>
-                              <img
-                                className={classes.paymentpix}
-                                src="/ticketzpix.png"
-                                alt="PIX"
-                              />
-                            </div>
-                            <Typography
-                              className={classes.pixkey}
-                              component="body2"
-                              paragraph
-                            >
-                              Clique para copiar a chave PIX
-                            </Typography>
-                          </div>
-                        </Grid>
-                        <Grid
-                          className={classes.supportBox}
-                          style={{ maxHeight: supportPix ? 35 : 300 }}
-                          item
-                          xs={12}
-                          onClick={() => setSupportPix(false)}
-                        >
-                          <Typography
-                            className={classes.clickpointer}
-                            component="h3"
-                            variant="h6"
-                            gutterBottom
-                            onClick={() => setSupportPix(true)}
-                          >
-                            {i18n.t("ticketz.support.mercadopagotitle")}
-                          </Typography>
-                          {supportPix || (
-                            <>
-                              {supportIsBr && (
-                                <>
-                                  <Typography component="body2" paragraph>
-                                    {i18n.t("ticketz.support.recurringbrl")}
-                                  </Typography>
-                                  <div>
-                                    <a
-                                      href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=2c9380848f1b8ed1018f2b011f90061f"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      <img
-                                        className={classes.paymentimg}
-                                        src="/mercadopago.png"
-                                        alt="Mercado Pago"
-                                      />
-                                    </a>
-                                  </div>
-                                </>
-                              )}
-                              {!supportIsBr && (
-                                <>
-                                  <Typography component="body2" paragraph>
-                                    {i18n.t("ticketz.support.international")}
-                                  </Typography>
-                                  <div>
-                                    <a
-                                      href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=X6XHVCPMRQEL4"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      <img
-                                        className={classes.paymentimg}
-                                        src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif"
-                                        alt="PayPal"
-                                      />
-                                    </a>
-                                  </div>
-                                </>
-                              )}
-                            </>
-                          )}
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  </Grid>
-                )}
-              </Grid>
-            </>
-          )}
-        />
-
         <Grid container spacing={3} justifyContent="flex-start">
           {/* USUARIOS ONLINE */}
           <InfoRingCard

@@ -25,6 +25,11 @@ interface Request {
   channel?: string;
   facebookPageUserId?: string;
   language?: string;
+  // ===== EvoHub (canal WhatsApp oficial) =====
+  evohubBaseUrl?: string;
+  evohubToken?: string;
+  evohubPhoneNumberId?: string;
+  evohubWabaId?: string;
 }
 
 interface Response {
@@ -50,7 +55,11 @@ const CreateWhatsAppService = async ({
   facebookPageUserId,
   tokenMeta,
   channel = "whatsapp",
-  language
+  language,
+  evohubBaseUrl,
+  evohubToken,
+  evohubPhoneNumberId,
+  evohubWabaId
 }: Request): Promise<Response> => {
   const company = await Company.findOne({
     where: {
@@ -142,10 +151,18 @@ const CreateWhatsAppService = async ({
     }
   }
 
+  // O canal oficial (EvoHub) opera por webhook, sem sessão Baileys, então não
+  // passa pelo StartWhatsAppSession que marcaria "CONNECTED". Já nasce conectado
+  // para não ficar preso em "OPENING" (spinner infinito) na tela de Conexões.
+  const initialStatus =
+    channel === "whatsapp_oficial" && status === "OPENING"
+      ? "CONNECTED"
+      : status;
+
   const whatsapp = await Whatsapp.create(
     {
       name,
-      status,
+      status: initialStatus,
       greetingMessage,
       complationMessage,
       outOfHoursMessage,
@@ -160,7 +177,11 @@ const CreateWhatsAppService = async ({
       facebookUserToken,
       facebookPageUserId,
       tokenMeta,
-      language
+      language,
+      evohubBaseUrl,
+      evohubToken,
+      evohubPhoneNumberId,
+      evohubWabaId
     },
     { include: ["queues"] }
   );
