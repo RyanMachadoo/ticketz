@@ -4,6 +4,7 @@ import {
   CreatedAt,
   UpdatedAt,
   Model,
+  DataType,
   PrimaryKey,
   AutoIncrement,
   ForeignKey,
@@ -57,6 +58,20 @@ class Campaign extends Model<Campaign> {
 
   @Column({ defaultValue: "INATIVA" })
   status: string; // INATIVA, PROGRAMADA, EM_ANDAMENTO, CANCELADA, FINALIZADA
+
+  // ===== Template da Meta (só p/ conexão oficial / EvoHub) =====
+  // Quando a conexão da campanha é "whatsapp_oficial", o disparo é feito com um
+  // template aprovado em vez das mensagens de texto livre (message1..5).
+  @Column(DataType.TEXT)
+  templateName: string;
+
+  @Column(DataType.TEXT)
+  templateLanguage: string;
+
+  // Valores das variáveis do corpo do template ({{1}}, {{2}}...), na ordem.
+  // Cada item pode conter variáveis de campanha ({nome}, {numero}, etc.).
+  @Column(DataType.JSON)
+  templateParams: string[];
 
   @Column
   confirmation: boolean;

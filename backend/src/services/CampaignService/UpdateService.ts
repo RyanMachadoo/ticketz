@@ -2,6 +2,7 @@ import AppError from "../../errors/AppError";
 import Campaign from "../../models/Campaign";
 import ContactList from "../../models/ContactList";
 import Whatsapp from "../../models/Whatsapp";
+import validateOfficialTemplate from "./validateOfficialTemplate";
 
 interface Data {
   id: number;
@@ -21,6 +22,10 @@ interface Data {
   confirmationMessage3?: string;
   confirmationMessage4?: string;
   confirmationMessage5?: string;
+  whatsappId?: number;
+  templateName?: string;
+  templateLanguage?: string;
+  templateParams?: string[];
 }
 
 const UpdateService = async (data: Data): Promise<Campaign> => {
@@ -42,6 +47,12 @@ const UpdateService = async (data: Data): Promise<Campaign> => {
   if (data.scheduledAt != null && data.status === "INATIVA") {
     data.status = "PROGRAMADA";
   }
+
+  // Conexão oficial (EvoHub) só dispara com template aprovado da Meta.
+  await validateOfficialTemplate(
+    data.whatsappId ?? record.whatsappId,
+    data.templateName ?? record.templateName
+  );
 
   await record.update(data);
 

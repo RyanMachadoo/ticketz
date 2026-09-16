@@ -23,6 +23,7 @@ import OutOfTicketMessage from "../models/OutOfTicketMessages";
 import { Session } from "../libs/wbot";
 import { getJidOf } from "../services/WbotServices/getJidOf";
 import { clearRepeatableJobsFromQueues } from "./repeatableJobs";
+import * as EvoHubProvider from "../services/EvoHubServices/EvoHubProvider";
 
 const connection = process.env.REDIS_URI || "";
 export const campaignQueue = new Queue("CampaignQueue", connection);
@@ -385,6 +386,50 @@ async function sendCampaignMessage(
   }
 }
 
+/**
+ * Disparo de campanha para conexão OFICIAL (EvoHub / Cloud API).
+ * Envia um template aprovado da Meta, preenchendo as variáveis do corpo
+ * ({{1}}, {{2}}...) por contato — cada valor pode conter {nome}, {numero}, etc.
+ * Não usa Baileys/wbot. A mídia da campanha é ignorada aqui (o template já
+ * carrega seu próprio cabeçalho/mídia, se houver).
+ */
+async function dispatchOfficialCampaign(
+  campaign: Campaign,
+  campaignShipping: CampaignShipping
+) {
+  const settings = await getSettings(campaign);
+  const contact = campaignShipping.contact;
+  const to = String(campaignShipping.number).replace(/\D/g, "");
+
+  const rawParams = isArray(campaign.templateParams)
+    ? campaign.templateParams
+    : [];
+  const params = rawParams.map(p =>
+    getProcessedMessage(String(p ?? ""), settings.variables, contact)
+  );
+
+  const components = params.length
+    ? [
+        {
+          type: "body",
+          parameters: params.map(text => ({ type: "text", text }))
+        }
+      ]
+    : undefined;
+
+  const language = campaign.templateLanguage || "pt_BR";
+
+  await EvoHubProvider.sendTemplate(
+    campaign.whatsapp,
+    to,
+    campaign.templateName,
+    language,
+    components
+  );
+
+  await campaignShipping.update({ deliveredAt: moment() });
+}
+
 async function handleDispatchCampaign(job) {
   try {
     const { data } = job;
@@ -398,8 +443,6 @@ async function handleDispatchCampaign(job) {
       return;
     }
 
-    const wbot = await GetWhatsappWbot(campaign.whatsapp);
-
     logger.info(
       `Disparo de campanha solicitado: Campanha=${campaignId};Registro=${campaignShippingId}`
     );
@@ -410,6 +453,24 @@ async function handleDispatchCampaign(job) {
         include: [{ model: ContactListItem, as: "contact" }]
       }
     );
+
+    // ===== Canal WhatsApp OFICIAL (EvoHub): dispara via template aprovado =====
+    if (campaign.whatsapp?.channel === "whatsapp_oficial") {
+      await dispatchOfficialCampaign(campaign, campaignShipping);
+      await verifyAndFinalizeCampaign(campaign);
+      const ioOfficial = getIO();
+      ioOfficial.emit(`company-${campaign.companyId}-campaign`, {
+        action: "update",
+        record: campaign
+      });
+      logger.info(
+        `Campanha (oficial) enviada para: Campanha=${campaignId};Contato=${campaignShipping.contact.name}`
+      );
+      return;
+    }
+
+    // ===== Canal Baileys (fluxo original) =====
+    const wbot = await GetWhatsappWbot(campaign.whatsapp);
 
     const shippingNumber = String(campaignShipping.number);
     const chatId = shippingNumber.endsWith("@lid")

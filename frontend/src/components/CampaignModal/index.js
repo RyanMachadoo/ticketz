@@ -31,7 +31,8 @@ import {
   MenuItem,
   Select,
   Tab,
-  Tabs
+  Tabs,
+  Typography
 } from "@material-ui/core";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import ConfirmationModal from "../ConfirmationModal";
@@ -74,6 +75,162 @@ const CampaignSchema = Yup.object().shape({
     .required("Required")
 });
 
+// Seção de template da Meta, exibida quando a conexão selecionada é oficial (EvoHub).
+// Definida em escopo de módulo (não dentro do CampaignModal) para manter a
+// identidade estável entre renders — assim o estado local (templates carregados)
+// e o foco dos inputs não se perdem a cada tecla digitada.
+const TemplateSection = ({ values, setFieldValue, disabled }) => {
+  const [templates, setTemplates] = useState([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!values.whatsappId) {
+      setTemplates([]);
+      return undefined;
+    }
+    setLoadingTemplates(true);
+    api
+      .get(`/wa-api/${values.whatsappId}/templates`, {
+        params: { onlyApproved: 1 }
+      })
+      .then(({ data }) => {
+        if (active) setTemplates(Array.isArray(data) ? data : []);
+      })
+      .catch(err => {
+        if (active) {
+          setTemplates([]);
+          toastError(err);
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingTemplates(false);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.whatsappId]);
+
+  const selectedTemplate =
+    templates.find(
+      t =>
+        t.name === values.templateName &&
+        t.language === values.templateLanguage
+    ) || templates.find(t => t.name === values.templateName);
+
+  const varCount = selectedTemplate
+    ? selectedTemplate.variablesCount
+    : Array.isArray(values.templateParams)
+    ? values.templateParams.length
+    : 0;
+
+  const handleSelectTemplate = e => {
+    const [name, language] = String(e.target.value).split("|||");
+    const tmpl = templates.find(
+      t => t.name === name && t.language === language
+    );
+    const count = tmpl ? tmpl.variablesCount : 0;
+    const prev = Array.isArray(values.templateParams)
+      ? values.templateParams
+      : [];
+    const next = Array.from({ length: count }, (_, i) => prev[i] ?? "");
+    setFieldValue("templateName", name);
+    setFieldValue("templateLanguage", language);
+    setFieldValue("templateParams", next);
+  };
+
+  return (
+    <Grid xs={12} item>
+      <Box style={{ paddingTop: 10 }}>
+        <Typography variant="body2" color="textSecondary" gutterBottom>
+          {i18n.t("campaigns.dialog.form.officialNotice")}
+        </Typography>
+        <FormControl variant="outlined" margin="dense" fullWidth>
+          <InputLabel id="template-selection-label">
+            {i18n.t("campaigns.dialog.form.template")}
+          </InputLabel>
+          <Select
+            labelId="template-selection-label"
+            label={i18n.t("campaigns.dialog.form.template")}
+            value={
+              values.templateName
+                ? `${values.templateName}|||${values.templateLanguage}`
+                : ""
+            }
+            onChange={handleSelectTemplate}
+            disabled={disabled || loadingTemplates}
+          >
+            <MenuItem value="">
+              {loadingTemplates
+                ? i18n.t("campaigns.dialog.form.templateLoading")
+                : i18n.t("campaigns.dialog.form.templateSelect")}
+            </MenuItem>
+            {templates.map(t => (
+              <MenuItem
+                key={`${t.name}|||${t.language}`}
+                value={`${t.name}|||${t.language}`}
+              >
+                {`${t.name} (${t.language})`}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        {!loadingTemplates && templates.length === 0 && (
+          <Typography variant="caption" color="error">
+            {i18n.t("campaigns.dialog.form.templateNone")}
+          </Typography>
+        )}
+
+        {selectedTemplate && selectedTemplate.bodyText && (
+          <Box
+            style={{
+              marginTop: 8,
+              marginBottom: 8,
+              padding: 8,
+              borderRadius: 4,
+              border: "1px solid rgba(0,0,0,0.15)",
+              whiteSpace: "pre-wrap",
+              fontSize: 13
+            }}
+          >
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("campaigns.dialog.form.templateBodyPreview")}
+            </Typography>
+            <div>{selectedTemplate.bodyText}</div>
+          </Box>
+        )}
+
+        {varCount > 0 && (
+          <Grid spacing={2} container>
+            {Array.from({ length: varCount }, (_, i) => (
+              <Grid xs={12} md={6} item key={`tplvar-${i}`}>
+                <TextField
+                  label={`${i18n.t(
+                    "campaigns.dialog.form.templateVariable"
+                  )} {{${i + 1}}}`}
+                  value={(values.templateParams || [])[i] ?? ""}
+                  onChange={e =>
+                    setFieldValue(`templateParams[${i}]`, e.target.value)
+                  }
+                  variant="outlined"
+                  margin="dense"
+                  fullWidth
+                  disabled={disabled}
+                  helperText={i18n.t(
+                    "campaigns.dialog.form.templateVariableHelper"
+                  )}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Box>
+    </Grid>
+  );
+};
+
 const CampaignModal = ({
   open,
   onClose,
@@ -104,6 +261,10 @@ const CampaignModal = ({
     scheduledAt: "",
     whatsappId: "",
     contactListId: "",
+    // Template da Meta (usado só quando a conexão é oficial / EvoHub)
+    templateName: "",
+    templateLanguage: "",
+    templateParams: [],
     companyId
   };
 
@@ -182,7 +343,18 @@ const CampaignModal = ({
     }
   };
 
+  const isOfficialConnection = whatsappId => {
+    const wa = whatsapps.find(w => String(w.id) === String(whatsappId));
+    return wa?.channel === "whatsapp_oficial";
+  };
+
   const handleSaveCampaign = async values => {
+    // Conexão oficial (EvoHub) exige template aprovado da Meta.
+    if (isOfficialConnection(values.whatsappId) && !values.templateName) {
+      toast.error(i18n.t("campaigns.dialog.form.templateRequired"));
+      return;
+    }
+
     try {
       const dataValues = {};
       Object.entries(values).forEach(([key, value]) => {
@@ -340,7 +512,9 @@ const CampaignModal = ({
             }, 400);
           }}
         >
-          {({ values, errors, touched, isSubmitting }) => (
+          {({ values, errors, touched, isSubmitting, setFieldValue }) => {
+            const isOfficial = isOfficialConnection(values.whatsappId);
+            return (
             <Form>
               <DialogContent dividers>
                 <Grid spacing={2} container>
@@ -358,35 +532,37 @@ const CampaignModal = ({
                       disabled={!campaignEditable}
                     />
                   </Grid>
-                  <Grid xs={12} md={3} item>
-                    <FormControl
-                      variant="outlined"
-                      margin="dense"
-                      fullWidth
-                      className={classes.formControl}
-                    >
-                      <InputLabel id="confirmation-selection-label">
-                        {i18n.t("campaigns.dialog.form.confirmation")}
-                      </InputLabel>
-                      <Field
-                        as={Select}
-                        label={i18n.t("campaigns.dialog.form.confirmation")}
-                        placeholder={i18n.t(
-                          "campaigns.dialog.form.confirmation"
-                        )}
-                        labelId="confirmation-selection-label"
-                        id="confirmation"
-                        name="confirmation"
-                        error={
-                          touched.confirmation && Boolean(errors.confirmation)
-                        }
-                        disabled={!campaignEditable}
+                  {!isOfficial && (
+                    <Grid xs={12} md={3} item>
+                      <FormControl
+                        variant="outlined"
+                        margin="dense"
+                        fullWidth
+                        className={classes.formControl}
                       >
-                        <MenuItem value={false}>Desabilitada</MenuItem>
-                        <MenuItem value={true}>Habilitada</MenuItem>
-                      </Field>
-                    </FormControl>
-                  </Grid>
+                        <InputLabel id="confirmation-selection-label">
+                          {i18n.t("campaigns.dialog.form.confirmation")}
+                        </InputLabel>
+                        <Field
+                          as={Select}
+                          label={i18n.t("campaigns.dialog.form.confirmation")}
+                          placeholder={i18n.t(
+                            "campaigns.dialog.form.confirmation"
+                          )}
+                          labelId="confirmation-selection-label"
+                          id="confirmation"
+                          name="confirmation"
+                          error={
+                            touched.confirmation && Boolean(errors.confirmation)
+                          }
+                          disabled={!campaignEditable}
+                        >
+                          <MenuItem value={false}>Desabilitada</MenuItem>
+                          <MenuItem value={true}>Habilitada</MenuItem>
+                        </Field>
+                      </FormControl>
+                    </Grid>
+                  )}
                   <Grid xs={12} md={4} item>
                     <FormControl
                       variant="outlined"
@@ -472,6 +648,13 @@ const CampaignModal = ({
                       disabled={!campaignEditable}
                     />
                   </Grid>
+                  {isOfficial ? (
+                    <TemplateSection
+                      values={values}
+                      setFieldValue={setFieldValue}
+                      disabled={!campaignEditable}
+                    />
+                  ) : (
                   <Grid xs={12} item>
                     <Tabs
                       value={messageTab}
@@ -590,7 +773,8 @@ const CampaignModal = ({
                       )}
                     </Box>
                   </Grid>
-                  {(campaign.mediaPath || attachment) && (
+                  )}
+                  {!isOfficial && (campaign.mediaPath || attachment) && (
                     <Grid xs={12} item>
                       <Button startIcon={<AttachFileIcon />}>
                         {attachment != null
@@ -628,16 +812,19 @@ const CampaignModal = ({
                     {i18n.t("campaigns.dialog.buttons.cancel")}
                   </Button>
                 )}
-                {!attachment && !campaign.mediaPath && campaignEditable && (
-                  <Button
-                    color="primary"
-                    onClick={() => attachmentFile.current.click()}
-                    disabled={isSubmitting}
-                    variant="outlined"
-                  >
-                    {i18n.t("campaigns.dialog.buttons.attach")}
-                  </Button>
-                )}
+                {!isOfficial &&
+                  !attachment &&
+                  !campaign.mediaPath &&
+                  campaignEditable && (
+                    <Button
+                      color="primary"
+                      onClick={() => attachmentFile.current.click()}
+                      disabled={isSubmitting}
+                      variant="outlined"
+                    >
+                      {i18n.t("campaigns.dialog.buttons.attach")}
+                    </Button>
+                  )}
                 <Button
                   onClick={handleClose}
                   color="secondary"
@@ -667,7 +854,8 @@ const CampaignModal = ({
                 )}
               </DialogActions>
             </Form>
-          )}
+            );
+          }}
         </Formik>
       </Dialog>
     </div>

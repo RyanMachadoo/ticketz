@@ -243,6 +243,26 @@ const messages = {
       internalChat: {
         title: "Internal Chat"
       },
+      whatsappTemplates: {
+        title: "WA API",
+        connection: "Official connection",
+        selectConnection: "Select a connection",
+        selectConnectionHint:
+          "Select an official connection to list the templates.",
+        noOfficialConnections:
+          "No official (EvoHub) connection found. Create an Official WhatsApp connection under Connections.",
+        empty: "No template found for this connection.",
+        createCampaign: "Create campaign",
+        table: {
+          name: "Name",
+          language: "Language",
+          category: "Category",
+          status: "Status",
+          body: "Body",
+          variables: "Variables",
+          actions: "Actions"
+        }
+      },
       whatsappModal: {
         title: {
           add: "Add WhatsApp",
@@ -555,6 +575,7 @@ const messages = {
           settings: "Settings",
           helps: "Help",
           messagesAPI: "API",
+          waApi: "WA API",
           schedules: "Schedules",
           campaigns: "Campaigns",
           annoucements: "Announcements",
@@ -738,7 +759,19 @@ const messages = {
             status: "Status",
             scheduledAt: "Scheduled",
             confirmation: "Confirmation",
-            contactList: "Contact List"
+            contactList: "Contact List",
+            officialNotice:
+              "Official connection (EvoHub): sending uses a Meta-approved template.",
+            template: "Template (Meta)",
+            templateSelect: "Select an approved template",
+            templateLoading: "Loading templates...",
+            templateNone: "No approved template found for this connection.",
+            templateBodyPreview: "Template preview:",
+            templateVariable: "Variable",
+            templateVariableHelper:
+              "You can use {nome}, {numero}, {email} and custom variables.",
+            templateRequired:
+              "Select an approved template to send on this official connection."
           },
           buttons: {
             add: "Add",

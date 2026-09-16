@@ -452,6 +452,11 @@ const MainListItems = props => {
               icon={<CodeRoundedIcon />}
             />
             <ListItemLink
+              to="/wa-api"
+              primary={i18n.t("mainDrawer.listItems.waApi")}
+              icon={<WhatsAppIcon />}
+            />
+            <ListItemLink
               to="/financeiro"
               primary={i18n.t("mainDrawer.listItems.financeiro")}
               icon={<LocalAtmIcon />}

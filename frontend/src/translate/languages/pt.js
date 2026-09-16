@@ -242,6 +242,26 @@ const messages = {
       internalChat: {
         title: "Chat Interno"
       },
+      whatsappTemplates: {
+        title: "WA API",
+        connection: "Conexão oficial",
+        selectConnection: "Selecione uma conexão",
+        selectConnectionHint:
+          "Selecione uma conexão oficial para listar os templates.",
+        noOfficialConnections:
+          "Nenhuma conexão oficial (EvoHub) encontrada. Crie uma conexão do tipo WhatsApp Oficial em Conexões.",
+        empty: "Nenhum template encontrado para esta conexão.",
+        createCampaign: "Criar campanha",
+        table: {
+          name: "Nome",
+          language: "Idioma",
+          category: "Categoria",
+          status: "Status",
+          body: "Corpo",
+          variables: "Variáveis",
+          actions: "Ações"
+        }
+      },
       whatsappModal: {
         title: {
           add: "Adicionar WhatsApp",
@@ -553,6 +573,7 @@ const messages = {
           settings: "Configurações",
           helps: "Ajuda",
           messagesAPI: "API",
+          waApi: "WA API",
           schedules: "Agendamentos",
           campaigns: "Campanhas",
           annoucements: "Informativos",
@@ -736,7 +757,20 @@ const messages = {
             status: "Status",
             scheduledAt: "Agendamento",
             confirmation: "Confirmação",
-            contactList: "Lista de Contato"
+            contactList: "Lista de Contato",
+            officialNotice:
+              "Conexão oficial (EvoHub): o disparo usa um template aprovado da Meta.",
+            template: "Template (Meta)",
+            templateSelect: "Selecione um template aprovado",
+            templateLoading: "Carregando templates...",
+            templateNone:
+              "Nenhum template aprovado encontrado para esta conexão.",
+            templateBodyPreview: "Prévia do template:",
+            templateVariable: "Variável",
+            templateVariableHelper:
+              "Pode usar {nome}, {numero}, {email} e variáveis personalizadas.",
+            templateRequired:
+              "Selecione um template aprovado para disparar nesta conexão oficial."
           },
           buttons: {
             add: "Adicionar",

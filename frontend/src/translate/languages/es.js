@@ -241,6 +241,26 @@ const messages = {
       internalChat: {
         title: "Chat Interno"
       },
+      whatsappTemplates: {
+        title: "WA API",
+        connection: "Conexión oficial",
+        selectConnection: "Selecciona una conexión",
+        selectConnectionHint:
+          "Selecciona una conexión oficial para listar las plantillas.",
+        noOfficialConnections:
+          "No se encontró ninguna conexión oficial (EvoHub). Crea una conexión de tipo WhatsApp Oficial en Conexiones.",
+        empty: "No se encontró ninguna plantilla para esta conexión.",
+        createCampaign: "Crear campaña",
+        table: {
+          name: "Nombre",
+          language: "Idioma",
+          category: "Categoría",
+          status: "Estado",
+          body: "Cuerpo",
+          variables: "Variables",
+          actions: "Acciones"
+        }
+      },
       whatsappModal: {
         title: {
           add: "Agregar WhatsApp",
@@ -556,6 +576,7 @@ const messages = {
           settings: "Configuraciones",
           helps: "Ayuda",
           messagesAPI: "API",
+          waApi: "WA API",
           schedules: "Agendamientos",
           campaigns: "Campañas",
           annoucements: "Anuncios",
@@ -739,7 +760,20 @@ const messages = {
             status: "Estado",
             scheduledAt: "Agendamiento",
             confirmation: "Confirmación",
-            contactList: "Lista de Contacto"
+            contactList: "Lista de Contacto",
+            officialNotice:
+              "Conexión oficial (EvoHub): el envío usa una plantilla aprobada por Meta.",
+            template: "Plantilla (Meta)",
+            templateSelect: "Selecciona una plantilla aprobada",
+            templateLoading: "Cargando plantillas...",
+            templateNone:
+              "No se encontró ninguna plantilla aprobada para esta conexión.",
+            templateBodyPreview: "Vista previa de la plantilla:",
+            templateVariable: "Variable",
+            templateVariableHelper:
+              "Puedes usar {nome}, {numero}, {email} y variables personalizadas.",
+            templateRequired:
+              "Selecciona una plantilla aprobada para enviar en esta conexión oficial."
           },
           buttons: {
             add: "Agregar",
