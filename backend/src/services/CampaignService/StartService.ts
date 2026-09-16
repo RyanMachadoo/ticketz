@@ -4,6 +4,7 @@ import Campaign from "../../models/Campaign";
 import ContactList from "../../models/ContactList";
 import Whatsapp from "../../models/Whatsapp";
 import { campaignQueue } from "../../queues/campaign";
+import { logger } from "../../utils/logger";
 
 /**
  * Dispara a campanha IMEDIATAMENTE (sem agendamento). Coloca a campanha em
@@ -29,6 +30,10 @@ export async function StartService(id: number): Promise<Campaign> {
     status: "EM_ANDAMENTO",
     scheduledAt: moment().toDate()
   });
+
+  logger.info(
+    `[Campanha] Disparar agora: id=${campaign.id} whatsappId=${campaign.whatsappId} contactListId=${campaign.contactListId} -> enfileirando ProcessCampaign`
+  );
 
   await campaignQueue.add(
     "ProcessCampaign",

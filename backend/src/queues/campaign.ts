@@ -326,9 +326,17 @@ async function handleProcessCampaign(job) {
   try {
     const { id }: ProcessCampaignData = job.data;
     let { delay }: ProcessCampaignData = job.data;
+    logger.info(`[Campanha] ProcessCampaign recebido: id=${id}`);
     const campaign = await getCampaign(id);
     const settings = await getSettings(campaign);
     if (campaign) {
+      logger.info(
+        `[Campanha] processando id=${campaign.id} status=${
+          campaign.status
+        } canal=${campaign.whatsapp?.channel} contactList=${!!campaign.contactList} contatos=${
+          campaign.contactList?.contacts?.length ?? 0
+        }`
+      );
       if (!campaign.contactList) {
         logger.error(
           `Campanha ${campaign.id} sem lista de contatos; nada a disparar.`
@@ -580,6 +588,11 @@ export async function startCampaignQueues() {
   campaignQueue.process("ProcessCampaign", handleProcessCampaign);
   campaignQueue.process("DispatchCampaign", handleDispatchCampaign);
   campaignQueue.process("DispatchConfirmedCampaign", handleDispatchCampaign);
+
+  // Marcador de versão para confirmar que o build novo está rodando.
+  logger.info(
+    "[Campanha] build EvoHub v3 ativo (template + header de imagem + disparo agora)"
+  );
 
   campaignQueue.add(
     "VerifyCampaignsDatabase",
