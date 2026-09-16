@@ -91,14 +91,17 @@ async function getCampaign(id: number) {
             model: ContactListItem,
             as: "contacts",
             attributes: ["id", "name", "number", "email", "isWhatsappValid"],
-            where: { isWhatsappValid: true }
+            // Carrega TODOS os contatos (LEFT JOIN). O filtro por número válido é
+            // feito em memória e só se aplica ao canal Baileys — no canal oficial
+            // (EvoHub) não há pré-validação, então envia para todos.
+            required: false
           }
         ]
       },
       {
         model: Whatsapp,
         as: "whatsapp",
-        attributes: ["id", "name"]
+        attributes: ["id", "name", "channel"]
       },
       {
         model: CampaignShipping,
@@ -326,7 +329,30 @@ async function handleProcessCampaign(job) {
     const campaign = await getCampaign(id);
     const settings = await getSettings(campaign);
     if (campaign) {
-      const { contacts } = campaign.contactList;
+      if (!campaign.contactList) {
+        logger.error(
+          `Campanha ${campaign.id} sem lista de contatos; nada a disparar.`
+        );
+        await campaign.update({ status: "FINALIZADA", completedAt: moment() });
+        return;
+      }
+
+      const isOfficial = campaign.whatsapp?.channel === "whatsapp_oficial";
+      const allContacts = campaign.contactList.contacts || [];
+      // Canal oficial (EvoHub) não tem pré-validação de número: envia para todos.
+      // Canal Baileys mantém o filtro de números válidos no WhatsApp.
+      const contacts = isOfficial
+        ? allContacts
+        : allContacts.filter(c => c.isWhatsappValid);
+
+      if (!contacts.length) {
+        logger.warn(
+          `Campanha ${campaign.id} sem contatos elegíveis (validos=${
+            allContacts.length
+          }, oficial=${isOfficial}).`
+        );
+      }
+
       const messages = getCampaignValidMessages(campaign);
       const confirmationMessages = campaign.confirmation
         ? getCampaignValidConfirmationMessages(campaign)

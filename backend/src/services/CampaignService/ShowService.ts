@@ -18,7 +18,7 @@ const ShowService = async (
   const campaign = await Campaign.findByPk(id, {
     include: [
       { model: ContactList },
-      { model: Whatsapp, attributes: ["id", "name"] }
+      { model: Whatsapp, attributes: ["id", "name", "channel"] }
     ]
   });
 
@@ -26,10 +26,13 @@ const ShowService = async (
     throw new AppError("ERR_NO_TICKETNOTE_FOUND", 404);
   }
 
+  // No canal oficial (EvoHub) não há pré-validação de número, então todos os
+  // contatos da lista contam como "válidos" no relatório e na finalização.
+  const isOfficial = campaign.whatsapp?.channel === "whatsapp_oficial";
   const valids = await ContactListItem.count({
     where: {
       contactListId: campaign.contactListId,
-      isWhatsappValid: true
+      ...(isOfficial ? {} : { isWhatsappValid: true })
     }
   });
 
