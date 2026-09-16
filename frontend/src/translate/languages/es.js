@@ -819,7 +819,9 @@ const messages = {
             templateVariableHelper:
               "Puedes usar {nome}, {numero}, {email} y variables personalizadas.",
             templateRequired:
-              "Selecciona una plantilla aprobada para enviar en esta conexión oficial."
+              "Selecciona una plantilla aprobada para enviar en esta conexión oficial.",
+            templateImageHint:
+              "Si la plantilla tiene encabezado de imagen, adjunta la imagen a la campaña — se envía en el encabezado de la plantilla."
           },
           buttons: {
             add: "Agregar",
@@ -828,7 +830,8 @@ const messages = {
             cancel: "Cancelar Disparos",
             restart: "Reiniciar Disparos",
             close: "Cerrar",
-            attach: "Adjuntar Archivo"
+            attach: "Adjuntar Archivo",
+            attachHeaderImage: "Adjuntar imagen del encabezado"
           }
         },
         confirmationModal: {

@@ -816,7 +816,9 @@ const messages = {
             templateVariableHelper:
               "Pode usar {nome}, {numero}, {email} e variáveis personalizadas.",
             templateRequired:
-              "Selecione um template aprovado para disparar nesta conexão oficial."
+              "Selecione um template aprovado para disparar nesta conexão oficial.",
+            templateImageHint:
+              "Se o template tiver cabeçalho de imagem, anexe a imagem na campanha — ela é enviada no header do template."
           },
           buttons: {
             add: "Adicionar",
@@ -825,7 +827,8 @@ const messages = {
             cancel: "Cancelar Disparos",
             restart: "Reiniciar Disparos",
             close: "Fechar",
-            attach: "Anexar Arquivo"
+            attach: "Anexar Arquivo",
+            attachHeaderImage: "Anexar imagem do cabeçalho"
           }
         },
         confirmationModal: {

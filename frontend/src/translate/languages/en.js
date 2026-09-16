@@ -817,7 +817,9 @@ const messages = {
             templateVariableHelper:
               "You can use {nome}, {numero}, {email} and custom variables.",
             templateRequired:
-              "Select an approved template to send on this official connection."
+              "Select an approved template to send on this official connection.",
+            templateImageHint:
+              "If the template has an image header, attach the image to the campaign — it is sent in the template header."
           },
           buttons: {
             add: "Add",
@@ -826,7 +828,8 @@ const messages = {
             cancel: "Cancel Dispatches",
             restart: "Restart Dispatches",
             close: "Close",
-            attach: "Attach File"
+            attach: "Attach File",
+            attachHeaderImage: "Attach header image"
           }
         },
         confirmationModal: {

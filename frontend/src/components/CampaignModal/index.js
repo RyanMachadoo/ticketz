@@ -146,6 +146,14 @@ const TemplateSection = ({ values, setFieldValue, disabled }) => {
         <Typography variant="body2" color="textSecondary" gutterBottom>
           {i18n.t("campaigns.dialog.form.officialNotice")}
         </Typography>
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          display="block"
+          gutterBottom
+        >
+          {i18n.t("campaigns.dialog.form.templateImageHint")}
+        </Typography>
         <FormControl variant="outlined" margin="dense" fullWidth>
           <InputLabel id="template-selection-label">
             {i18n.t("campaigns.dialog.form.template")}
@@ -774,7 +782,7 @@ const CampaignModal = ({
                     </Box>
                   </Grid>
                   )}
-                  {!isOfficial && (campaign.mediaPath || attachment) && (
+                  {(campaign.mediaPath || attachment) && (
                     <Grid xs={12} item>
                       <Button startIcon={<AttachFileIcon />}>
                         {attachment != null
@@ -812,19 +820,18 @@ const CampaignModal = ({
                     {i18n.t("campaigns.dialog.buttons.cancel")}
                   </Button>
                 )}
-                {!isOfficial &&
-                  !attachment &&
-                  !campaign.mediaPath &&
-                  campaignEditable && (
-                    <Button
-                      color="primary"
-                      onClick={() => attachmentFile.current.click()}
-                      disabled={isSubmitting}
-                      variant="outlined"
-                    >
-                      {i18n.t("campaigns.dialog.buttons.attach")}
-                    </Button>
-                  )}
+                {!attachment && !campaign.mediaPath && campaignEditable && (
+                  <Button
+                    color="primary"
+                    onClick={() => attachmentFile.current.click()}
+                    disabled={isSubmitting}
+                    variant="outlined"
+                  >
+                    {isOfficial
+                      ? i18n.t("campaigns.dialog.buttons.attachHeaderImage")
+                      : i18n.t("campaigns.dialog.buttons.attach")}
+                  </Button>
+                )}
                 <Button
                   onClick={handleClose}
                   color="secondary"

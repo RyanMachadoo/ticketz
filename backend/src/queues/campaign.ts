@@ -414,10 +414,12 @@ async function sendCampaignMessage(
 
 /**
  * Disparo de campanha para conexão OFICIAL (EvoHub / Cloud API).
- * Envia um template aprovado da Meta, preenchendo as variáveis do corpo
- * ({{1}}, {{2}}...) por contato — cada valor pode conter {nome}, {numero}, etc.
- * Não usa Baileys/wbot. A mídia da campanha é ignorada aqui (o template já
- * carrega seu próprio cabeçalho/mídia, se houver).
+ * Envia um template aprovado da Meta:
+ *  - HEADER de imagem: usa a imagem anexada à campanha (link público). Necessário
+ *    quando o template aprovado tem cabeçalho de imagem (senão a Meta rejeita).
+ *  - BODY: preenche as variáveis {{1}}, {{2}}... com os valores da campanha, que
+ *    podem conter {nome}, {numero}, etc. (processados por contato).
+ * Não usa Baileys/wbot.
  */
 async function dispatchOfficialCampaign(
   campaign: Campaign,
@@ -425,7 +427,12 @@ async function dispatchOfficialCampaign(
 ) {
   const settings = await getSettings(campaign);
   const contact = campaignShipping.contact;
-  const to = String(campaignShipping.number).replace(/\D/g, "");
+
+  // Garante DDI 55 quando o número vem sem código do país (padrão BR).
+  let to = String(campaignShipping.number).replace(/\D/g, "");
+  if (to && !to.startsWith("55") && to.length <= 11) {
+    to = `55${to}`;
+  }
 
   const rawParams = isArray(campaign.templateParams)
     ? campaign.templateParams
@@ -434,24 +441,47 @@ async function dispatchOfficialCampaign(
     getProcessedMessage(String(p ?? ""), settings.variables, contact)
   );
 
-  const components = params.length
-    ? [
-        {
-          type: "body",
-          parameters: params.map(text => ({ type: "text", text }))
-        }
-      ]
-    : undefined;
+  const components: any[] = [];
+
+  // Header de imagem (quando o template exige), a partir da mídia da campanha.
+  if (campaign.mediaPath) {
+    const base = process.env.BACKEND_URL || "";
+    const imageUrl = campaign.mediaPath.startsWith("http")
+      ? campaign.mediaPath
+      : `${base}/public/${campaign.mediaPath}`;
+    components.push({
+      type: "header",
+      parameters: [{ type: "image", image: { link: imageUrl } }]
+    });
+  }
+
+  if (params.length) {
+    components.push({
+      type: "body",
+      parameters: params.map(text => ({ type: "text", text }))
+    });
+  }
 
   const language = campaign.templateLanguage || "pt_BR";
 
-  await EvoHubProvider.sendTemplate(
-    campaign.whatsapp,
-    to,
-    campaign.templateName,
-    language,
-    components
-  );
+  try {
+    await EvoHubProvider.sendTemplate(
+      campaign.whatsapp,
+      to,
+      campaign.templateName,
+      language,
+      components.length ? components : undefined
+    );
+  } catch (err: any) {
+    // Loga o motivo real vindo da Meta/EvoHub (ex.: header de imagem ausente,
+    // template não aprovado, número inválido) para facilitar o diagnóstico.
+    const detail =
+      err?.response?.data?.error?.message || err?.message || "erro desconhecido";
+    logger.error(
+      `[Campanha oficial] falha ao enviar template '${campaign.templateName}' para ${to}: ${detail}`
+    );
+    throw err;
+  }
 
   await campaignShipping.update({ deliveredAt: moment() });
 }
