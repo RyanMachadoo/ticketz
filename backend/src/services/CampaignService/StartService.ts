@@ -1,6 +1,7 @@
 import moment from "moment";
 import AppError from "../../errors/AppError";
 import Campaign from "../../models/Campaign";
+import CampaignShipping from "../../models/CampaignShipping";
 import ContactList from "../../models/ContactList";
 import Whatsapp from "../../models/Whatsapp";
 import { campaignQueue } from "../../queues/campaign";
@@ -31,8 +32,21 @@ export async function StartService(id: number): Promise<Campaign> {
     scheduledAt: moment().toDate()
   });
 
+  // Reset dos envios anteriores: sem isso, o prepareContact pula contatos cujo
+  // CampaignShipping já tem deliveredAt/confirmationRequestedAt de tentativas
+  // passadas, e o disparo imediato não reenvia nada.
+  const [resetCount] = await CampaignShipping.update(
+    {
+      deliveredAt: null,
+      confirmationRequestedAt: null,
+      confirmedAt: null,
+      jobId: null
+    },
+    { where: { campaignId: campaign.id } }
+  );
+
   logger.info(
-    `[Campanha] Disparar agora: id=${campaign.id} whatsappId=${campaign.whatsappId} contactListId=${campaign.contactListId} -> enfileirando ProcessCampaign`
+    `[Campanha] Disparar agora: id=${campaign.id} whatsappId=${campaign.whatsappId} contactListId=${campaign.contactListId} enviosResetados=${resetCount} -> enfileirando ProcessCampaign`
   );
 
   await campaignQueue.add(

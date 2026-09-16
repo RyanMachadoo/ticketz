@@ -3,6 +3,7 @@ import moment from "moment";
 import { QueryTypes } from "sequelize";
 import { isEmpty, isNil, isArray } from "lodash";
 import path from "path";
+import mime from "mime-types";
 import { AnyMessageContent } from "libzapitu-rf";
 import Campaign from "../models/Campaign";
 import ContactList from "../models/ContactList";
@@ -319,6 +320,13 @@ async function prepareContact(
     );
 
     await record.update({ jobId: `${nextJob.id}` });
+    logger.info(
+      `[Campanha] DispatchCampaign enfileirado: campanha=${campaign.id} shipping=${record.id} numero=${campaignShipping.number} jobId=${nextJob.id}`
+    );
+  } else {
+    logger.warn(
+      `[Campanha] contato PULADO (já entregue/confirmado): campanha=${campaign.id} shipping=${record.id} deliveredAt=${record.deliveredAt} confirmationRequestedAt=${record.confirmationRequestedAt}`
+    );
   }
 }
 
@@ -375,11 +383,17 @@ async function handleProcessCampaign(job) {
             delay,
             messages,
             confirmationMessages
-          ).then(() => {
-            logger.info(
-              `Registro enviado pra fila de disparo: Campanha=${campaign.id};Contato=${contact.name};Delay=${delay}`
-            );
-          });
+          )
+            .then(() => {
+              logger.info(
+                `Registro enviado pra fila de disparo: Campanha=${campaign.id};Contato=${contact.name};Delay=${delay}`
+              );
+            })
+            .catch(err => {
+              logger.error(
+                `[Campanha] prepareContact falhou: campanha=${campaign.id} contato=${contact.number}: ${err?.message}`
+              );
+            });
 
           index += 1;
           if (index % settings.longerIntervalAfter === 0) {
@@ -420,11 +434,43 @@ async function sendCampaignMessage(
   }
 }
 
+// Cache de media_id do EvoHub por campanha, para não re-subir a imagem do header
+// a cada contato (o media_id é reutilizável). Vive no processo do worker.
+const officialHeaderMediaCache = new Map<string, string>();
+
+/**
+ * Sobe a imagem anexada à campanha para o EvoHub (POST /{phoneNumberId}/media)
+ * e devolve o media_id, cacheado por campanha. Usado no header de templates de
+ * imagem — mais confiável que link público (não depende do /public estar exposto).
+ */
+async function getOfficialHeaderMediaId(
+  campaign: Campaign
+): Promise<string | null> {
+  if (!campaign.mediaPath) return null;
+  const key = `${campaign.id}:${campaign.mediaPath}`;
+  const cached = officialHeaderMediaCache.get(key);
+  if (cached) return cached;
+
+  const filePath = path.resolve("public", campaign.mediaPath);
+  const mimetype = (mime.lookup(filePath) || "image/jpeg").toString();
+  const mediaId = await EvoHubProvider.uploadMedia(
+    campaign.whatsapp,
+    filePath,
+    mimetype
+  );
+  officialHeaderMediaCache.set(key, mediaId);
+  logger.info(
+    `[Campanha oficial] imagem do header enviada ao EvoHub: campanha=${campaign.id} media_id=${mediaId}`
+  );
+  return mediaId;
+}
+
 /**
  * Disparo de campanha para conexão OFICIAL (EvoHub / Cloud API).
  * Envia um template aprovado da Meta:
- *  - HEADER de imagem: usa a imagem anexada à campanha (link público). Necessário
- *    quando o template aprovado tem cabeçalho de imagem (senão a Meta rejeita).
+ *  - HEADER de imagem: sobe a imagem anexada à campanha e usa o media_id (com
+ *    fallback para link público). Necessário quando o template tem cabeçalho de
+ *    imagem (senão a Meta rejeita).
  *  - BODY: preenche as variáveis {{1}}, {{2}}... com os valores da campanha, que
  *    podem conter {nome}, {numero}, etc. (processados por contato).
  * Não usa Baileys/wbot.
@@ -451,15 +497,30 @@ async function dispatchOfficialCampaign(
 
   const components: any[] = [];
 
-  // Header de imagem (quando o template exige), a partir da mídia da campanha.
+  // Header de imagem (quando o template exige). Sobe a imagem ao EvoHub e usa o
+  // media_id; se o upload falhar, cai para link público como fallback.
   if (campaign.mediaPath) {
-    const base = process.env.BACKEND_URL || "";
-    const imageUrl = campaign.mediaPath.startsWith("http")
-      ? campaign.mediaPath
-      : `${base}/public/${campaign.mediaPath}`;
+    let headerImage: any = null;
+    try {
+      const mediaId = await getOfficialHeaderMediaId(campaign);
+      if (mediaId) headerImage = { id: mediaId };
+    } catch (err: any) {
+      const detail =
+        err?.response?.data?.error?.message || err?.message || "erro";
+      logger.warn(
+        `[Campanha oficial] upload da imagem do header falhou (${detail}); usando link público como fallback.`
+      );
+    }
+    if (!headerImage) {
+      const base = process.env.BACKEND_URL || "";
+      const imageUrl = campaign.mediaPath.startsWith("http")
+        ? campaign.mediaPath
+        : `${base}/public/${campaign.mediaPath}`;
+      headerImage = { link: imageUrl };
+    }
     components.push({
       type: "header",
-      parameters: [{ type: "image", image: { link: imageUrl } }]
+      parameters: [{ type: "image", image: headerImage }]
     });
   }
 
