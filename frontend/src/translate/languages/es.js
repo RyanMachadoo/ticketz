@@ -241,6 +241,51 @@ const messages = {
       internalChat: {
         title: "Chat Interno"
       },
+      integrations: {
+        title: "Integraciones",
+        add: "Agregar webhook",
+        hint:
+          "Registra webhooks para que ticketz envíe eventos (mensajes, tickets) a n8n u otro sistema y dispare automatizaciones.",
+        empty: "Ningún webhook registrado.",
+        test: "Enviar evento de prueba",
+        statusActive: "Activo",
+        statusInactive: "Inactivo",
+        confirmDeleteTitle: "Eliminar webhook",
+        confirmDeleteMessage:
+          "¿Seguro? ticketz dejará de enviar eventos a esta URL.",
+        table: {
+          name: "Nombre",
+          url: "URL",
+          events: "Eventos",
+          active: "Activo",
+          actions: "Acciones"
+        },
+        modal: {
+          addTitle: "Agregar webhook",
+          editTitle: "Editar webhook",
+          name: "Nombre",
+          url: "URL del webhook (n8n)",
+          secret: "Secret (opcional)",
+          secretHelper:
+            "Si se completa, el cuerpo se firma con HMAC-SHA256 en el header X-Ticketz-Signature.",
+          events: "Eventos que disparan este webhook",
+          active: "Activo",
+          cancel: "Cancelar",
+          saveAdd: "Agregar",
+          saveEdit: "Guardar"
+        },
+        eventLabels: {
+          messageReceived: "Mensaje recibido (contacto)",
+          messageSent: "Mensaje enviado (agente)",
+          ticketCreated: "Ticket creado",
+          ticketUpdated: "Ticket actualizado (estado/cola)"
+        },
+        toasts: {
+          success: "Webhook guardado con éxito.",
+          deleted: "Webhook eliminado.",
+          tested: "Evento de prueba enviado."
+        }
+      },
       whatsappTemplates: {
         title: "WA API",
         connection: "Conexión oficial",
@@ -577,6 +622,7 @@ const messages = {
           helps: "Ayuda",
           messagesAPI: "API",
           waApi: "WA API",
+          integrations: "Integraciones",
           schedules: "Agendamientos",
           campaigns: "Campañas",
           annoucements: "Anuncios",

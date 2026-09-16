@@ -16,6 +16,7 @@ import Queues from "../pages/Queues/";
 import Tags from "../pages/Tags/";
 import MessagesAPI from "../pages/MessagesAPI/";
 import WhatsappTemplates from "../pages/WhatsappTemplates/";
+import Integrations from "../pages/Integrations/";
 import Helps from "../pages/Helps/";
 import ContactLists from "../pages/ContactLists/";
 import ContactListItems from "../pages/ContactListItems/";
@@ -94,6 +95,12 @@ const Routes = () => {
                   exact
                   path="/wa-api"
                   component={WhatsappTemplates}
+                  isPrivate
+                />
+                <Route
+                  exact
+                  path="/integrations"
+                  component={Integrations}
                   isPrivate
                 />
                 <Route

@@ -17,6 +17,7 @@ import { incrementCounter } from "../CounterServices/IncrementCounter";
 import { getJidOf } from "../WbotServices/getJidOf";
 import Queue from "../../models/Queue";
 import { _t } from "../TranslationServices/i18nService";
+import { dispatchWebhookEvent } from "../WebhookServices/DispatchWebhook";
 
 export interface UpdateTicketData {
   status?: string;
@@ -234,6 +235,9 @@ const UpdateTicketService = async ({
               ticketId: ticket.id
             });
 
+          // Integrações (webhook de saída): ticket atualizado. Fire-and-forget.
+          dispatchWebhookEvent(ticket.companyId, "ticket.updated", ticket);
+
           return { ticket, oldStatus, oldUserId };
         }
       }
@@ -428,6 +432,9 @@ const UpdateTicketService = async ({
     }
 
     websocketUpdateTicket(ticket, [`user-${oldUserId}`]);
+
+    // Integrações (webhook de saída): ticket atualizado. Fire-and-forget.
+    dispatchWebhookEvent(ticket.companyId, "ticket.updated", ticket);
 
     return { ticket, oldStatus, oldUserId };
   } catch (err) {

@@ -11,6 +11,7 @@ import Whatsapp from "../../models/Whatsapp";
 import Queue from "../../models/Queue";
 import { incrementCounter } from "../CounterServices/IncrementCounter";
 import AppError from "../../errors/AppError";
+import { dispatchWebhookEvent } from "../WebhookServices/DispatchWebhook";
 
 const createTicketMutex = new Mutex();
 
@@ -169,6 +170,8 @@ const internalFindOrCreateTicketService = async (
 
   if (result.justCreated) {
     incrementCounter(companyId, "ticket-create");
+    // Integrações (webhook de saída): novo ticket. Fire-and-forget.
+    dispatchWebhookEvent(companyId, "ticket.created", result.ticket);
   }
 
   return result;

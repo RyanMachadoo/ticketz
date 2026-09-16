@@ -36,6 +36,7 @@ import wavoipRoutes from "./wavoipRoutes";
 import dockerRoutes from "./dockerRoutes";
 import evoHubRoutes from "./evoHubRoutes";
 import waApiRoutes from "./waApiRoutes";
+import webhookRoutes from "./webhookRoutes";
 
 const routes = Router();
 
@@ -44,6 +45,7 @@ routes.use("/auth", authRoutes);
 routes.use(settingRoutes);
 routes.use(evoHubRoutes);
 routes.use(waApiRoutes);
+routes.use(webhookRoutes);
 routes.use(contactRoutes);
 routes.use(ticketRoutes);
 routes.use(buildCaptureExtensionRoutes);

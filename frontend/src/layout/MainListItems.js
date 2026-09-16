@@ -18,6 +18,7 @@ import FlashOnIcon from "@material-ui/icons/FlashOn";
 import CalendarToday from "@material-ui/icons/CalendarToday";
 import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import CodeRoundedIcon from "@material-ui/icons/CodeRounded";
+import SettingsInputComponentIcon from "@material-ui/icons/SettingsInputComponent";
 import EventIcon from "@material-ui/icons/Event";
 import InfoIcon from "@material-ui/icons/Info";
 import DarkMode from "../components/DarkMode";
@@ -455,6 +456,11 @@ const MainListItems = props => {
               to="/wa-api"
               primary={i18n.t("mainDrawer.listItems.waApi")}
               icon={<WhatsAppIcon />}
+            />
+            <ListItemLink
+              to="/integrations"
+              primary={i18n.t("mainDrawer.listItems.integrations")}
+              icon={<SettingsInputComponentIcon />}
             />
             <ListItemLink
               to="/financeiro"

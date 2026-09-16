@@ -243,6 +243,51 @@ const messages = {
       internalChat: {
         title: "Internal Chat"
       },
+      integrations: {
+        title: "Integrations",
+        add: "Add webhook",
+        hint:
+          "Register webhooks so ticketz sends events (messages, tickets) to n8n or another system and triggers automations.",
+        empty: "No webhooks registered.",
+        test: "Send test event",
+        statusActive: "Active",
+        statusInactive: "Inactive",
+        confirmDeleteTitle: "Delete webhook",
+        confirmDeleteMessage:
+          "Are you sure? ticketz will stop sending events to this URL.",
+        table: {
+          name: "Name",
+          url: "URL",
+          events: "Events",
+          active: "Active",
+          actions: "Actions"
+        },
+        modal: {
+          addTitle: "Add webhook",
+          editTitle: "Edit webhook",
+          name: "Name",
+          url: "Webhook URL (n8n)",
+          secret: "Secret (optional)",
+          secretHelper:
+            "If set, the body is signed with HMAC-SHA256 in the X-Ticketz-Signature header.",
+          events: "Events that trigger this webhook",
+          active: "Active",
+          cancel: "Cancel",
+          saveAdd: "Add",
+          saveEdit: "Save"
+        },
+        eventLabels: {
+          messageReceived: "Message received (contact)",
+          messageSent: "Message sent (agent)",
+          ticketCreated: "Ticket created",
+          ticketUpdated: "Ticket updated (status/queue)"
+        },
+        toasts: {
+          success: "Webhook saved successfully.",
+          deleted: "Webhook deleted.",
+          tested: "Test event sent."
+        }
+      },
       whatsappTemplates: {
         title: "WA API",
         connection: "Official connection",
@@ -576,6 +621,7 @@ const messages = {
           helps: "Help",
           messagesAPI: "API",
           waApi: "WA API",
+          integrations: "Integrations",
           schedules: "Schedules",
           campaigns: "Campaigns",
           annoucements: "Announcements",

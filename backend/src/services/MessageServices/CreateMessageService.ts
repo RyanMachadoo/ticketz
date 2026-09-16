@@ -6,6 +6,7 @@ import OldMessage from "../../models/OldMessage";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
+import { dispatchWebhookEvent } from "../WebhookServices/DispatchWebhook";
 
 interface MessageData {
   id: string;
@@ -132,6 +133,15 @@ const CreateMessageService = async ({
     },
     "sending appMessage event"
   );
+
+  // Integrações (webhook de saída): notifica sistemas externos (ex.: n8n).
+  // Fire-and-forget: nunca bloqueia nem quebra o fluxo de mensagens.
+  dispatchWebhookEvent(
+    companyId,
+    message.fromMe ? "message.sent" : "message.received",
+    message
+  );
+
   return message;
 };
 

@@ -242,6 +242,51 @@ const messages = {
       internalChat: {
         title: "Chat Interno"
       },
+      integrations: {
+        title: "Integrações",
+        add: "Adicionar webhook",
+        hint:
+          "Cadastre webhooks para o ticketz enviar eventos (mensagens, tickets) para o n8n ou outro sistema e disparar automações.",
+        empty: "Nenhum webhook cadastrado.",
+        test: "Enviar evento de teste",
+        statusActive: "Ativo",
+        statusInactive: "Inativo",
+        confirmDeleteTitle: "Excluir webhook",
+        confirmDeleteMessage:
+          "Tem certeza? O ticketz deixará de enviar eventos para esta URL.",
+        table: {
+          name: "Nome",
+          url: "URL",
+          events: "Eventos",
+          active: "Ativo",
+          actions: "Ações"
+        },
+        modal: {
+          addTitle: "Adicionar webhook",
+          editTitle: "Editar webhook",
+          name: "Nome",
+          url: "URL do webhook (n8n)",
+          secret: "Secret (opcional)",
+          secretHelper:
+            "Se preenchido, o corpo é assinado em HMAC-SHA256 no header X-Ticketz-Signature.",
+          events: "Eventos que disparam este webhook",
+          active: "Ativo",
+          cancel: "Cancelar",
+          saveAdd: "Adicionar",
+          saveEdit: "Salvar"
+        },
+        eventLabels: {
+          messageReceived: "Mensagem recebida (cliente)",
+          messageSent: "Mensagem enviada (atendente)",
+          ticketCreated: "Ticket criado",
+          ticketUpdated: "Ticket atualizado (status/fila)"
+        },
+        toasts: {
+          success: "Webhook salvo com sucesso.",
+          deleted: "Webhook excluído.",
+          tested: "Evento de teste enviado."
+        }
+      },
       whatsappTemplates: {
         title: "WA API",
         connection: "Conexão oficial",
@@ -574,6 +619,7 @@ const messages = {
           helps: "Ajuda",
           messagesAPI: "API",
           waApi: "WA API",
+          integrations: "Integrações",
           schedules: "Agendamentos",
           campaigns: "Campanhas",
           annoucements: "Informativos",
