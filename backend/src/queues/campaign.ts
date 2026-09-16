@@ -273,6 +273,10 @@ async function prepareContact(
       contact
     );
     campaignShipping.message = `${message}`;
+  } else {
+    // Canal oficial (EvoHub) não usa message1..5 (envia template), mas a coluna
+    // "message" do CampaignShipping é NOT NULL — grava vazio p/ satisfazer o banco.
+    campaignShipping.message = "";
   }
 
   if (campaign.confirmation) {
