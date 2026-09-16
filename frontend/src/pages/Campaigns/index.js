@@ -26,6 +26,7 @@ import DescriptionIcon from "@material-ui/icons/Description";
 import TimerOffIcon from "@material-ui/icons/TimerOff";
 import PlayCircleOutlineIcon from "@material-ui/icons/PlayCircleOutline";
 import PauseCircleOutlineIcon from "@material-ui/icons/PauseCircleOutline";
+import SendIcon from "@material-ui/icons/Send";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -107,6 +108,8 @@ const Campaigns = () => {
   const [hasMore, setHasMore] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [deletingCampaign, setDeletingCampaign] = useState(null);
+  const [dispatchingCampaign, setDispatchingCampaign] = useState(null);
+  const [dispatchConfirmOpen, setDispatchConfirmOpen] = useState(false);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [searchParam, setSearchParam] = useState("");
@@ -244,6 +247,18 @@ const Campaigns = () => {
     }
   };
 
+  const dispatchCampaignNow = async campaign => {
+    try {
+      await api.post(`/campaigns/${campaign.id}/start`);
+      toast.success("Campanha enviada para disparo imediato.");
+      setPageNumber(1);
+      fetchCampaigns();
+    } catch (err) {
+      toastError(err);
+    }
+    setDispatchingCampaign(null);
+  };
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -258,6 +273,18 @@ const Campaigns = () => {
         onConfirm={() => handleDeleteCampaign(deletingCampaign.id)}
       >
         {i18n.t("campaigns.confirmationModal.deleteMessage")}
+      </ConfirmationModal>
+      <ConfirmationModal
+        title={
+          dispatchingCampaign &&
+          `Disparar agora a campanha ${dispatchingCampaign.name}?`
+        }
+        open={dispatchConfirmOpen}
+        onClose={setDispatchConfirmOpen}
+        onConfirm={() => dispatchCampaignNow(dispatchingCampaign)}
+      >
+        Os disparos começam imediatamente, sem agendamento, para todos os
+        contatos válidos da lista. Deseja continuar?
       </ConfirmationModal>
       <CampaignModal
         resetPagination={() => {
@@ -390,6 +417,21 @@ const Campaigns = () => {
                           size="small"
                         >
                           <PlayCircleOutlineIcon />
+                        </IconButton>
+                      )}
+                      {(campaign.status === "INATIVA" ||
+                        campaign.status === "PROGRAMADA" ||
+                        campaign.status === "CANCELADA") && (
+                        <IconButton
+                          onClick={() => {
+                            setDispatchingCampaign(campaign);
+                            setDispatchConfirmOpen(true);
+                          }}
+                          title="Disparar agora"
+                          size="small"
+                          color="primary"
+                        >
+                          <SendIcon />
                         </IconButton>
                       )}
                       <IconButton

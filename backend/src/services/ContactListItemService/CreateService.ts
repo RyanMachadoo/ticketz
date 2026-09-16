@@ -3,6 +3,7 @@ import AppError from "../../errors/AppError";
 import ContactListItem from "../../models/ContactListItem";
 import { logger } from "../../utils/logger";
 import CheckContactNumber from "../WbotServices/CheckNumber";
+import GetValidationWhatsapp from "../../helpers/GetValidationWhatsapp";
 
 interface Data {
   name: string;
@@ -36,14 +37,32 @@ const CreateService = async (data: Data): Promise<ContactListItem> => {
     defaults: data
   });
 
-  try {
-    const response = await CheckContactNumber(record.number, record.companyId);
-    record.isWhatsappValid = response.exists;
-    const number = response.jid.replace(/\D/g, "");
-    record.number = number;
+  const digits = `${record.number}`.replace(/\D/g, "");
+  const validator = await GetValidationWhatsapp(record.companyId);
+
+  if (!validator) {
+    // Sem sessão Baileys conectada (ex.: empresa só com canal oficial/EvoHub):
+    // não é possível pré-validar o número no WhatsApp. Assume válido para não
+    // travar a campanha (o filtro de disparo usa isWhatsappValid: true).
+    record.isWhatsappValid = true;
+    record.number = digits;
     await record.save();
-  } catch (e) {
-    logger.error(`Número de contato inválido: ${record.number}`);
+  } else {
+    try {
+      const response = await CheckContactNumber(
+        record.number,
+        record.companyId,
+        validator
+      );
+      record.isWhatsappValid = response.exists;
+      record.number = response.jid.replace(/\D/g, "");
+      await record.save();
+    } catch (e) {
+      record.isWhatsappValid = false;
+      record.number = digits;
+      await record.save();
+      logger.error(`Número de contato inválido: ${digits}`);
+    }
   }
 
   return record;

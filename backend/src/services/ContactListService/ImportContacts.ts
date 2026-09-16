@@ -3,6 +3,7 @@ import XLSX from "xlsx";
 import { has } from "lodash";
 import ContactListItem from "../../models/ContactListItem";
 import CheckContactNumber from "../WbotServices/CheckNumber";
+import GetValidationWhatsapp from "../../helpers/GetValidationWhatsapp";
 import { logger } from "../../utils/logger";
 // import CheckContactNumber from "../WbotServices/CheckNumber";
 
@@ -62,15 +63,36 @@ export async function ImportContacts(
   }
 
   if (contactList) {
+    // Busca o validador Baileys uma única vez para toda a importação.
+    const validator = await GetValidationWhatsapp(companyId);
+
     for (let newContact of contactList) {
+      const digits = `${newContact.number}`.replace(/\D/g, "");
+
+      if (!validator) {
+        // Sem sessão Baileys conectada (ex.: só canal oficial/EvoHub): assume
+        // válido para não travar a campanha.
+        newContact.isWhatsappValid = true;
+        newContact.number = digits;
+        await newContact.save();
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
       try {
-        const response = await CheckContactNumber(newContact.number, companyId);
+        const response = await CheckContactNumber(
+          newContact.number,
+          companyId,
+          validator
+        );
         newContact.isWhatsappValid = response.exists;
-        const number = response.jid.replace(/\D/g, "");
-        newContact.number = number;
+        newContact.number = response.jid.replace(/\D/g, "");
         await newContact.save();
       } catch (e) {
-        logger.error(`Número de contato inválido: ${newContact.number}`);
+        newContact.isWhatsappValid = false;
+        newContact.number = digits;
+        await newContact.save();
+        logger.error(`Número de contato inválido: ${digits}`);
       }
     }
   }

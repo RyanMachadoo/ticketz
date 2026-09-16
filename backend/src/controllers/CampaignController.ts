@@ -17,6 +17,7 @@ import Campaign from "../models/Campaign";
 import AppError from "../errors/AppError";
 import { CancelService } from "../services/CampaignService/CancelService";
 import { RestartService } from "../services/CampaignService/RestartService";
+import { StartService } from "../services/CampaignService/StartService";
 
 type IndexQuery = {
   searchParam: string;
@@ -139,6 +140,24 @@ export const restart = async (
   await RestartService(+id);
 
   return res.status(204).json({ message: "Reinício dos disparos" });
+};
+
+export const startNow = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { id } = req.params;
+  const { companyId } = req.user;
+
+  const record = await StartService(+id);
+
+  const io = getIO();
+  io.emit(`company-${companyId}-campaign`, {
+    action: "update",
+    record
+  });
+
+  return res.status(200).json(record);
 };
 
 export const remove = async (
