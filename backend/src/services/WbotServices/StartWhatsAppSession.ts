@@ -10,6 +10,16 @@ export const StartWhatsAppSession = async (
   companyId: number,
   isRefresh = false
 ): Promise<void> => {
+  // Canal oficial (EvoHub / Cloud API) não tem sessão Baileys para abrir: ele
+  // opera por API + webhook. "Reconectar" apenas marca a conexão como CONNECTED
+  // (as credenciais já ficam salvas). Sem este guard, o retry tentaria abrir um
+  // socket Baileys e deixaria a conexão travada em OPENING ("expirada").
+  if (whatsapp.channel === "whatsapp_oficial") {
+    await whatsapp.update({ status: "CONNECTED", retries: 0 });
+    sendWhatsappUpdate(whatsapp);
+    return;
+  }
+
   await whatsapp.update({ status: "OPENING" });
 
   sendWhatsappUpdate(whatsapp);

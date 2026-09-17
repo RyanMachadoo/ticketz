@@ -285,6 +285,17 @@ const Connections = () => {
   const renderActionButtons = whatsApp => {
     return (
       <>
+        {whatsApp.channel === "whatsapp_oficial" &&
+          whatsApp.status !== "CONNECTED" && (
+            <Tooltip title="Reconectar (canal oficial / EvoHub)">
+              <IconButton
+                size="small"
+                onClick={() => handleStartWhatsAppSession(whatsApp.id)}
+              >
+                <Replay />
+              </IconButton>
+            </Tooltip>
+          )}
         {whatsApp.status === "qrcode" && (
           <Tooltip title={i18n.t("connections.toolTips.scan")}>
             <IconButton
