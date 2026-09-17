@@ -3,12 +3,33 @@ import { Op, WhereOptions } from "sequelize";
 import { getIO } from "../libs/socket";
 import Message from "../models/Message";
 import Ticket from "../models/Ticket";
+import Whatsapp from "../models/Whatsapp";
 import { logger } from "../utils/logger";
 import GetTicketWbot from "./GetTicketWbot";
 
 const SetTicketMessagesAsRead = async (ticket: Ticket): Promise<void> => {
   await ticket.update({ unreadMessages: 0 }, { silent: true });
   let companyId: number;
+
+  // Canal oficial (EvoHub) não tem sessão Baileys: marca como lido só no banco,
+  // sem chamar wbot (que lançaria ERR_WAPP_NOT_INITIALIZED e poluiria o log).
+  const officialConnection = await Whatsapp.findByPk(ticket.whatsappId);
+  if (officialConnection?.channel === "whatsapp_oficial") {
+    await Message.update(
+      { read: true },
+      { where: { ticketId: ticket.id, read: false } }
+    );
+    const ioOfficial = getIO();
+    ioOfficial
+      .to(ticket.id.toString())
+      .to(`company-${ticket.companyId}-${ticket.status}`)
+      .to(`queue-${ticket.queueId}-${ticket.status}`)
+      .emit(`company-${ticket.companyId}-ticket`, {
+        action: "updateUnread",
+        ticketId: ticket.id
+      });
+    return;
+  }
 
   try {
     const wbot = await GetTicketWbot(ticket);

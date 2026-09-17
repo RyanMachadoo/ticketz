@@ -136,7 +136,15 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
   const ticket = await ShowTicketService(ticketId, companyId);
   const { channel } = ticket;
-  if (channel === "whatsapp") {
+
+  // Decide pelo canal da CONEXÃO, não do ticket: tickets antigos do EvoHub
+  // ficaram com channel "whatsapp" (default do modelo), mas a conexão é oficial
+  // e não tem sessão Baileys. Sem isto, o verifyContact chamaria getWbot e
+  // lançaria ERR_WAPP_NOT_INITIALIZED ("sessão não foi inicializada").
+  const connection = await Whatsapp.findByPk(ticket.whatsappId);
+  const isOfficial = connection?.channel === "whatsapp_oficial";
+
+  if (channel === "whatsapp" && !isOfficial) {
     await SetTicketMessagesAsRead(ticket);
     if (!ticket.isGroup) {
       const contact = await ShowContactService(ticket.contactId, companyId);
@@ -149,10 +157,17 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         await ticket.reload();
       }
     }
+  } else if (isOfficial) {
+    // Canal oficial: só marca como lido no banco (sem wbot).
+    await SetTicketMessagesAsRead(ticket);
   }
 
+  // SendWhatsAppMessage/SendWhatsAppMedia roteiam para o EvoHub internamente
+  // quando a conexão é oficial.
+  const canSend = channel === "whatsapp" || isOfficial;
+
   if (medias) {
-    if (channel === "whatsapp") {
+    if (canSend) {
       await Promise.all(
         medias.map(async (media: Express.Multer.File) => {
           await SendWhatsAppMedia({ media, ticket });
@@ -160,7 +175,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         })
       );
     }
-  } else if (channel === "whatsapp") {
+  } else if (canSend) {
     await SendWhatsAppMessage({ body, ticket, userId, quotedMsg });
   }
 
