@@ -1,6 +1,6 @@
 import Queue from "bull";
 import moment from "moment";
-import { QueryTypes } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { isEmpty, isNil, isArray } from "lodash";
 import path from "path";
 import mime from "mime-types";
@@ -367,11 +367,37 @@ async function handleProcessCampaign(job) {
         ? allContacts
         : allContacts.filter(c => c.isWhatsappValid);
 
-      if (!contacts.length) {
+      // Continuação/retomada: descobre quem já foi enviado ou confirmado nesta
+      // campanha e REMOVE do laço. Sem isso o "delay" acumulava também sobre os
+      // já entregues, empurrando os restantes para horas no futuro (campanha
+      // "travada em X de Y"). O prepareContact ainda checa por segurança, mas
+      // aqui garantimos que o atraso só cresça sobre quem realmente falta.
+      const processedShippings = await CampaignShipping.findAll({
+        where: {
+          campaignId: campaign.id,
+          [Op.or]: [
+            { deliveredAt: { [Op.not]: null } },
+            { confirmationRequestedAt: { [Op.not]: null } }
+          ]
+        },
+        attributes: ["contactId"]
+      });
+      const processedContactIds = new Set(
+        processedShippings.map(s => s.contactId)
+      );
+      const pendingContacts = contacts.filter(
+        c => !processedContactIds.has(c.id)
+      );
+
+      logger.info(
+        `[Campanha] id=${campaign.id} total=${contacts.length} jaProcessados=${processedContactIds.size} pendentes=${pendingContacts.length}`
+      );
+
+      if (!pendingContacts.length) {
         logger.warn(
-          `Campanha ${campaign.id} sem contatos elegíveis (validos=${
+          `Campanha ${campaign.id} sem contatos pendentes (validos=${
             allContacts.length
-          }, oficial=${isOfficial}).`
+          }, jaProcessados=${processedContactIds.size}, oficial=${isOfficial}).`
         );
       }
 
@@ -379,9 +405,9 @@ async function handleProcessCampaign(job) {
       const confirmationMessages = campaign.confirmation
         ? getCampaignValidConfirmationMessages(campaign)
         : null;
-      if (isArray(contacts)) {
+      if (isArray(pendingContacts)) {
         let index = 0;
-        contacts.forEach(contact => {
+        pendingContacts.forEach(contact => {
           prepareContact(
             campaign,
             settings.variables,
