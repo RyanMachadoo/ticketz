@@ -92,10 +92,12 @@ async function getCampaign(id: number) {
             model: ContactListItem,
             as: "contacts",
             attributes: ["id", "name", "number", "email", "isWhatsappValid"],
-            // Carrega TODOS os contatos (LEFT JOIN). O filtro por número válido é
-            // feito em memória e só se aplica ao canal Baileys — no canal oficial
-            // (EvoHub) não há pré-validação, então envia para todos.
-            required: false
+            // Carrega TODOS os contatos. O filtro por número válido é feito em
+            // memória e só se aplica ao canal Baileys — no canal oficial (EvoHub)
+            // não há pré-validação, então envia para todos.
+            // separate:true = query própria (sem JOIN com a raiz), evitando
+            // produto cartesiano/estouro de memória em listas grandes.
+            separate: true
           }
         ]
       },
@@ -103,12 +105,12 @@ async function getCampaign(id: number) {
         model: Whatsapp,
         as: "whatsapp",
         attributes: ["id", "name", "channel"]
-      },
-      {
-        model: CampaignShipping,
-        as: "shipping",
-        include: [{ model: ContactListItem, as: "contact" }]
       }
+      // IMPORTANTE: NÃO incluir "shipping" aqui. Campaign hasMany contacts (N) e
+      // hasMany shipping (M) no MESMO include geram um produto cartesiano N×M no
+      // Sequelize (milhões de linhas em memória) -> "JavaScript heap out of memory"
+      // e loop de reinício. handleProcessCampaign nunca usa campaign.shipping;
+      // o prepareContact busca/atualiza o CampaignShipping por conta própria.
     ]
   });
 }

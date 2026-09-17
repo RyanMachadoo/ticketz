@@ -21,7 +21,16 @@ export async function CancelService(id: number) {
   for (const record of recordsToCancel) {
     // eslint-disable-next-line no-await-in-loop
     const job = await campaignQueue.getJob(+record.jobId);
-    promises.push(job.remove());
+    // job pode ser null quando já foi processado/removido do Redis (ou o Redis
+    // foi reiniciado). Sem esta checagem, job.remove() lança
+    // "Cannot read properties of null (reading 'remove')" e o pausar quebra.
+    if (job) {
+      promises.push(
+        job.remove().catch(() => {
+          /* job já saindo da fila; ignora */
+        })
+      );
+    }
   }
 
   await Promise.all(promises);
