@@ -301,7 +301,11 @@ const messages = {
           active: "Activo",
           queues: "Colas atendidas",
           queuesHint:
-            "El agente responde automáticamente a los tickets de estas colas (sin agente humano asignado).",
+            "El agente responde automáticamente a los tickets de estas colas (sin agente humano asignado). Actúa mientras el ticket esté en una de estas colas.",
+          transferQueue: "Cola de transferencia (atención humana)",
+          transferQueueDefault: "Predeterminada (Atención Humana)",
+          transferQueueHint:
+            "A dónde el agente envía el ticket al transferir a un humano. Debe ser una cola SIN agente — al moverlo allí, el agente deja de actuar. Si se deja en Predeterminada, el sistema usa/crea la cola \"Atendimento Humano\".",
           systemPrompt: "Instrucciones (system prompt)",
           systemPromptHint:
             "Defina el rol, el tono y las reglas del agente. Ya recibe el contexto del cliente.",

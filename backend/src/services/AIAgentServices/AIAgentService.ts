@@ -18,6 +18,7 @@ export interface AIAgentData {
   maxToolSteps?: number;
   isActive?: boolean;
   queueIds?: number[];
+  transferQueueId?: number | null;
 }
 
 /** Serializa o agente para a UI: sem a chave, com hasApiKey e queueIds. */
@@ -121,7 +122,11 @@ export async function createAgent(
     systemPrompt: data.systemPrompt || "",
     tools: Array.isArray(data.tools) ? data.tools : [],
     maxToolSteps: data.maxToolSteps ? Number(data.maxToolSteps) : 5,
-    isActive: data.isActive !== undefined ? !!data.isActive : true
+    isActive: data.isActive !== undefined ? !!data.isActive : true,
+    transferQueueId:
+      data.transferQueueId === undefined || data.transferQueueId === null
+        ? null
+        : Number(data.transferQueueId)
   } as any);
 
   await syncQueues(agent, data.queueIds, companyId);
@@ -154,7 +159,13 @@ export async function updateAgent(
       data.maxToolSteps !== undefined
         ? Number(data.maxToolSteps)
         : agent.maxToolSteps,
-    isActive: data.isActive !== undefined ? !!data.isActive : agent.isActive
+    isActive: data.isActive !== undefined ? !!data.isActive : agent.isActive,
+    transferQueueId:
+      data.transferQueueId === undefined
+        ? agent.transferQueueId
+        : data.transferQueueId === null || `${data.transferQueueId}` === ""
+        ? null
+        : Number(data.transferQueueId)
   };
 
   // Só troca a chave quando vier uma nova não vazia (mantém a atual caso contrário).

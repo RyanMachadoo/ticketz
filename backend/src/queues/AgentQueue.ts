@@ -42,11 +42,33 @@ export function maybeEnqueueAgent(message: Message): void {
     const ticket: any = message.ticket;
     if (!ticket) return;
     if (ticket.isGroup) return;
-    if (ticket.status === "closed") return;
-    if (ticket.userId) return; // humano já assumiu
-    if (ticket.useAgent === false) return; // transferido / desligado
-    if (!ticket.queue || !ticket.queue.aiAgentId) return; // fila sem agente
 
+    // Só faz sentido logar/decidir quando a FILA do ticket tem agente. Para
+    // tickets em filas sem agente, fica em silêncio (não é caso do agente).
+    const queueHasAgent = !!(ticket.queue && ticket.queue.aiAgentId);
+    if (!queueHasAgent) return;
+
+    // A partir daqui a fila TEM agente: deixamos claro no log por que atua ou não.
+    if (ticket.status === "closed") {
+      logger.info(`[Agente IA] ticket=${ticket.id} NÃO atua: ticket fechado.`);
+      return;
+    }
+    if (ticket.userId) {
+      logger.info(
+        `[Agente IA] ticket=${ticket.id} NÃO atua: atendente humano já assumiu (userId=${ticket.userId}).`
+      );
+      return;
+    }
+    if (ticket.useAgent === false) {
+      logger.info(
+        `[Agente IA] ticket=${ticket.id} NÃO atua: já transferido/desligado (useAgent=false).`
+      );
+      return;
+    }
+
+    logger.info(
+      `[Agente IA] ticket=${ticket.id} VAI responder (fila=${ticket.queue.name || ticket.queueId}, agenteId=${ticket.queue.aiAgentId}).`
+    );
     agentQueue
       .add(
         { ticketId: ticket.id, companyId: message.companyId },

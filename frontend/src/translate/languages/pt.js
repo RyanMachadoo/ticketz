@@ -302,7 +302,11 @@ const messages = {
           active: "Ativo",
           queues: "Filas atendidas",
           queuesHint:
-            "O agente responde automaticamente aos tickets destas filas (sem atendente humano atribuído).",
+            "O agente responde automaticamente aos tickets destas filas (sem atendente humano atribuído). Ele atua enquanto o ticket estiver numa destas filas.",
+          transferQueue: "Fila de transferência (atendimento humano)",
+          transferQueueDefault: "Padrão (Atendimento Humano)",
+          transferQueueHint:
+            "Para onde o agente envia o ticket ao transferir para um humano. Deve ser uma fila SEM agente — ao mover pra cá, o agente para de atuar. Se deixar em Padrão, o sistema usa/cria a fila \"Atendimento Humano\".",
           systemPrompt: "Instruções (system prompt)",
           systemPromptHint:
             "Defina o papel, o tom e as regras do agente. Ele já recebe o contexto do cliente.",

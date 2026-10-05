@@ -4,7 +4,74 @@ import Queue from "../../models/Queue";
 import Ticket from "../../models/Ticket";
 import { logger } from "../../utils/logger";
 import { dispatchWebhookEvent } from "../WebhookServices/DispatchWebhook";
+import ShowTicketService from "../TicketServices/ShowTicketService";
 import { AnthropicTool } from "./AnthropicProvider";
+
+export const HUMAN_QUEUE_NAME = "Atendimento Humano";
+
+/**
+ * Garante uma fila de "atendimento humano" (sem agente) para a empresa, criando
+ * se não existir. É a rede de segurança do transfer quando o agente não tem uma
+ * fila de transferência configurada. Nunca lança — devolve null em último caso.
+ */
+export async function getOrCreateHumanQueue(
+  companyId: number
+): Promise<Queue | null> {
+  try {
+    const existing = await Queue.findOne({
+      where: { companyId, name: HUMAN_QUEUE_NAME }
+    });
+    if (existing) return existing;
+
+    const palette = [
+      "#607D8B",
+      "#455A64",
+      "#5D4037",
+      "#37474F",
+      "#6D4C41",
+      "#795548",
+      "#9E9E9E"
+    ];
+    // tenta cores da paleta; cor/nome têm unique, então cai no fallback se falhar
+    // eslint-disable-next-line no-restricted-syntax
+    for (const color of palette) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        return await Queue.create({
+          name: HUMAN_QUEUE_NAME,
+          color,
+          companyId,
+          greetingMessage: ""
+        } as any);
+      } catch (e) {
+        /* cor em uso: tenta a próxima */
+      }
+    }
+    // fallback: nome com sufixo da empresa + cor aleatória
+    for (let i = 0; i < 5; i += 1) {
+      const color = `#${Math.floor(Math.random() * 16777215)
+        .toString(16)
+        .padStart(6, "0")}`;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        return await Queue.create({
+          name: `${HUMAN_QUEUE_NAME} ${companyId}`,
+          color,
+          companyId,
+          greetingMessage: ""
+        } as any);
+      } catch (e) {
+        /* tenta de novo */
+      }
+    }
+    return null;
+  } catch (err: any) {
+    logger.error(
+      `[Agente IA] falha ao obter/criar fila de atendimento humano: ${err?.message}`
+    );
+    return null;
+  }
+}
 
 /**
  * Converte a config de ferramentas do agente (JSON) no formato de tools da
@@ -42,36 +109,45 @@ function buildInputSchema(parameters: any[]): AnthropicTool["input_schema"] {
   return { type: "object", properties, required };
 }
 
+/** Definição da ferramenta nativa de transferência (formato Anthropic). */
+function transferToolDef(description?: string): AnthropicTool {
+  return {
+    name: TRANSFER_TOOL_NAME,
+    description:
+      description ||
+      "Transfere o atendimento para um atendente humano. Use quando o cliente pedir uma pessoa, entrar em negociação de preço/desconto/financiamento/avaliação de troca, quiser fechar/reservar, em pós-venda/oficina/reclamação, ou quando você não puder resolver. Ao usar, o atendimento SAI da sua fila e você para de responder.",
+    input_schema: {
+      type: "object",
+      properties: {
+        motivo: {
+          type: "string",
+          description:
+            "Motivo da transferência e um resumo do que já coletou (nome, interesse, melhor horário)."
+        },
+        fila: {
+          type: "string",
+          description:
+            "Nome da fila de destino (opcional). Se vazio, usa a fila de atendimento humano padrão do agente."
+        }
+      },
+      required: ["motivo"]
+    }
+  };
+}
+
 /**
  * Monta a lista de tools (formato Anthropic) para uma config de agente.
- * Sempre inclui a ferramenta nativa de transferência quando habilitada.
+ * A ferramenta de transferência é SEMPRE incluída (mesmo que o admin não a
+ * tenha adicionado), para o agente sempre conseguir passar para um humano.
  */
 export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
   const result: AnthropicTool[] = [];
+  let hasTransfer = false;
   (tools || []).forEach(t => {
     if (!t) return;
     if (t.kind === "transfer") {
-      result.push({
-        name: TRANSFER_TOOL_NAME,
-        description:
-          t.description ||
-          "Transfere o atendimento para uma fila/atendente humano quando necessário (dúvida fora do escopo, pedido do cliente, etc.).",
-        input_schema: {
-          type: "object",
-          properties: {
-            motivo: {
-              type: "string",
-              description: "Motivo da transferência (curto)."
-            },
-            fila: {
-              type: "string",
-              description:
-                "Nome da fila de destino (opcional). Se vazio, mantém a fila atual."
-            }
-          },
-          required: ["motivo"]
-        }
-      });
+      result.push(transferToolDef(t.description));
+      hasTransfer = true;
       return;
     }
     if (!t.name) return;
@@ -81,6 +157,9 @@ export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
       input_schema: buildInputSchema(t.parameters)
     });
   });
+  if (!hasTransfer) {
+    result.push(transferToolDef());
+  }
   return result;
 }
 
@@ -112,6 +191,7 @@ export interface AgentToolContext {
   ticketId: number;
   contactName: string;
   contactNumber: string;
+  transferQueueId?: number | null;
 }
 
 export interface ToolExecutionResult {
@@ -217,7 +297,12 @@ export async function executeTool(
   }
 }
 
-/** Transfere o atendimento: tira o agente e deixa o ticket pendente na fila. */
+/**
+ * Transfere o atendimento: move o ticket para a fila de atendimento humano
+ * (SEMPRE sai da fila do agente) e desliga o agente nesse ticket.
+ * Ordem do destino: fila citada pelo modelo -> fila de transferência do agente
+ * -> fila padrão "Atendimento Humano" (criada se não existir).
+ */
 async function executeTransfer(
   input: any,
   ctx: AgentToolContext
@@ -227,7 +312,8 @@ async function executeTransfer(
     return { content: "Ticket não encontrado para transferir.", isError: true };
   }
 
-  let targetQueueId = ticket.queueId;
+  let targetQueueId: number | null = null;
+
   const filaNome = input?.fila ? String(input.fila).trim() : "";
   if (filaNome) {
     const queue = await Queue.findOne({
@@ -236,35 +322,49 @@ async function executeTransfer(
     if (queue) targetQueueId = queue.id;
   }
 
+  if (!targetQueueId && ctx.transferQueueId) {
+    targetQueueId = ctx.transferQueueId;
+  }
+
+  if (!targetQueueId) {
+    const humanQueue = await getOrCreateHumanQueue(ctx.companyId);
+    if (humanQueue) targetQueueId = humanQueue.id;
+  }
+
+  // useAgent=false garante que o agente para mesmo se, no pior caso, não houver
+  // fila de destino (aí o ticket só fica pendente na fila atual).
   await ticket.update({
     useAgent: false,
     chatbot: false,
     status: "pending",
     userId: null,
-    queueId: targetQueueId
+    queueId: targetQueueId || ticket.queueId
   });
 
   try {
     const io = getIO();
-    io.to(`company-${ctx.companyId}-pending`)
-      .to(ticket.id.toString())
+    const fullTicket = await ShowTicketService(ctx.ticketId, ctx.companyId);
+    io.to(ctx.ticketId.toString())
+      .to(`company-${ctx.companyId}-pending`)
+      .to(`company-${ctx.companyId}-notification`)
+      .to(`queue-${targetQueueId}-pending`)
       .emit(`company-${ctx.companyId}-ticket`, {
         action: "update",
-        ticket
+        ticket: fullTicket
       });
   } catch (e) {
     // socket é best-effort
   }
 
   logger.info(
-    `[Agente IA] atendimento transferido (ticket=${ctx.ticketId}) motivo="${
-      input?.motivo || ""
-    }" fila=${targetQueueId}`
+    `[Agente IA] TRANSFERIDO ticket=${ctx.ticketId} -> fila=${
+      targetQueueId || ticket.queueId
+    } (agente desligado). Motivo: ${input?.motivo || "-"}`
   );
 
   return {
     content:
-      "Atendimento transferido para um atendente humano. Encerre sua participação de forma educada.",
+      "Atendimento transferido para um atendente humano. Você saiu desta conversa — dê uma despedida curta e educada e não responda mais.",
     isError: false,
     transferred: true
   };

@@ -85,6 +85,11 @@ class AIAgent extends Model<AIAgent> {
   @Column
   isActive: boolean;
 
+  // Fila para onde o agente transfere ao "passar para o humano" (sem agente).
+  // Ao mover o ticket pra cá, o agente para de atuar.
+  @Column
+  transferQueueId: number;
+
   @HasMany(() => Queue)
   queues: Queue[];
 

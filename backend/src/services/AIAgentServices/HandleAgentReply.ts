@@ -137,7 +137,8 @@ export async function handleAgentReply(
       companyId,
       ticketId,
       contactName,
-      contactNumber
+      contactNumber,
+      transferQueueId: agent.transferQueueId || null
     };
 
     const messages = await buildConversation(ticketId, companyId);

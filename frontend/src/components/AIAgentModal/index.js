@@ -92,7 +92,8 @@ const defaultForm = {
   isActive: true,
   systemPrompt: "",
   tools: [],
-  queueIds: []
+  queueIds: [],
+  transferQueueId: ""
 };
 
 const AIAgentModal = ({ open, onClose, agentId }) => {
@@ -130,7 +131,11 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             isActive: data.isActive !== undefined ? data.isActive : true,
             systemPrompt: data.systemPrompt || "",
             tools: Array.isArray(data.tools) ? data.tools : [],
-            queueIds: Array.isArray(data.queueIds) ? data.queueIds : []
+            queueIds: Array.isArray(data.queueIds) ? data.queueIds : [],
+            transferQueueId:
+              data.transferQueueId === null || data.transferQueueId === undefined
+                ? ""
+                : data.transferQueueId
           });
         } catch (err) {
           toastError(err);
@@ -206,7 +211,9 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         isActive: form.isActive,
         systemPrompt: form.systemPrompt,
         tools: form.tools,
-        queueIds: form.queueIds
+        queueIds: form.queueIds,
+        transferQueueId:
+          form.transferQueueId === "" ? null : Number(form.transferQueueId)
       };
       // Só envia a chave se o usuário digitou uma nova.
       if (form.apiKey && form.apiKey.trim()) {
@@ -528,6 +535,28 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             </FormControl>
             <Typography variant="caption" color="textSecondary">
               {i18n.t("aiAgents.modal.queuesHint")}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}>
+            <FormControl fullWidth margin="dense">
+              <InputLabel>{i18n.t("aiAgents.modal.transferQueue")}</InputLabel>
+              <Select
+                value={form.transferQueueId}
+                onChange={e => setField("transferQueueId", e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>{i18n.t("aiAgents.modal.transferQueueDefault")}</em>
+                </MenuItem>
+                {queues.map(q => (
+                  <MenuItem key={q.id} value={q.id}>
+                    {q.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("aiAgents.modal.transferQueueHint")}
             </Typography>
           </Grid>
 

@@ -303,7 +303,11 @@ const messages = {
           active: "Active",
           queues: "Served queues",
           queuesHint:
-            "The agent auto-replies to tickets in these queues (with no human assigned).",
+            "The agent auto-replies to tickets in these queues (with no human assigned). It acts while the ticket stays in one of these queues.",
+          transferQueue: "Transfer queue (human handoff)",
+          transferQueueDefault: "Default (Human Attendance)",
+          transferQueueHint:
+            "Where the agent sends the ticket when handing off to a human. Must be a queue WITHOUT an agent — moving it there stops the agent. If left as Default, the system uses/creates the \"Atendimento Humano\" queue.",
           systemPrompt: "Instructions (system prompt)",
           systemPromptHint:
             "Define the agent's role, tone and rules. It already receives the customer context.",
