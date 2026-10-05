@@ -2,6 +2,10 @@ import axios, { AxiosInstance } from "axios";
 import FormData from "form-data";
 import fs from "fs";
 import Whatsapp from "../../models/Whatsapp";
+import {
+  assertServiceSendAllowed,
+  incrementUsage
+} from "../UsageServices/UsageService";
 
 /**
  * Cliente do proxy oficial EvoHub (Meta Cloud API / Graph v23).
@@ -39,6 +43,8 @@ export async function sendText(
   to: string,
   body: string
 ): Promise<EvoHubSendResult> {
+  // Mensagem de serviço (atendimento): respeita o limite mensal de custo.
+  await assertServiceSendAllowed(whatsapp);
   const api = client(whatsapp);
   const { data } = await api.post(`/${whatsapp.evohubPhoneNumberId}/messages`, {
     messaging_product: "whatsapp",
@@ -46,6 +52,8 @@ export async function sendText(
     type: "text",
     text: { body }
   });
+  // Contabiliza só após o envio ter sido aceito.
+  await incrementUsage(whatsapp, "service");
   return { wamid: data?.messages?.[0]?.id, raw: data };
 }
 
@@ -105,6 +113,8 @@ export async function sendMediaById(
   caption?: string,
   filename?: string
 ): Promise<EvoHubSendResult> {
+  // Mídia enviada num atendimento também é mensagem de serviço.
+  await assertServiceSendAllowed(whatsapp);
   const api = client(whatsapp);
   const media: any = { id: mediaId };
   if (caption && kind !== "audio") media.caption = caption;
@@ -115,6 +125,7 @@ export async function sendMediaById(
     type: kind,
     [kind]: media
   });
+  await incrementUsage(whatsapp, "service");
   return { wamid: data?.messages?.[0]?.id, raw: data };
 }
 

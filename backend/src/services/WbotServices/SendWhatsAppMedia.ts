@@ -323,6 +323,10 @@ export const SendWhatsAppMedia = async ({
       ...options
     } as AnyMediaMessageContent);
   } catch (error) {
+    // Envio bloqueado pelo limite mensal de custo: erro específico p/ a UI.
+    if ((error as any)?.usageBlocked) {
+      throw new AppError("ERR_WA_OFFICIAL_LIMIT_REACHED", 429);
+    }
     logger.error({ message: error.message }, "Error sending WhatsApp media");
     throw new AppError("ERR_SENDING_WAPP_MSG");
   }

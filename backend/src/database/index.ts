@@ -42,6 +42,9 @@ import OutOfTicketMessage from "../models/OutOfTicketMessages";
 import Translation from "../models/Translation";
 import Wavoip from "../models/Wavoip";
 import Webhook from "../models/Webhook";
+import MessageUsage from "../models/MessageUsage";
+import AIAgent from "../models/AIAgent";
+import CtwaReferral from "../models/CtwaReferral";
 
 const dbConfig = require("../config/database");
 
@@ -96,7 +99,10 @@ const models = [
   Subscriptions,
   Translation,
   Wavoip,
-  Webhook
+  Webhook,
+  MessageUsage,
+  AIAgent,
+  CtwaReferral
 ];
 
 sequelize.addModels(models);

@@ -69,6 +69,10 @@ const SendWhatsAppMessage = async ({
       // apenas com a chave/id, que é o que os chamadores costumam usar.
       return { key: { id: wamid } } as unknown as WAMessage;
     } catch (err) {
+      // Envio bloqueado pelo limite mensal de custo: erro específico p/ a UI.
+      if ((err as any)?.usageBlocked) {
+        throw new AppError("ERR_WA_OFFICIAL_LIMIT_REACHED", 429);
+      }
       Sentry.captureException(err);
       console.log(err);
       throw new AppError("ERR_SENDING_WAPP_MSG");

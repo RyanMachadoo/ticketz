@@ -242,6 +242,158 @@ const messages = {
       internalChat: {
         title: "Chat Interno"
       },
+      ctwaReport: {
+        title: "Leads Click-to-WhatsApp",
+        hint:
+          "Mostra de qual anúncio Click-to-WhatsApp cada conversa veio (atribuição capturada da API oficial). A origem também fica disponível para o agente de IA e para os webhooks (evento ctwa.lead).",
+        apply: "Aplicar",
+        startDate: "De",
+        endDate: "Até",
+        totalLeads: "Total de leads",
+        empty: "Nenhum lead de anúncio no período.",
+        noHeadline: "(sem título)",
+        table: {
+          ad: "Anúncio",
+          adId: "ID do anúncio",
+          type: "Origem",
+          leads: "Leads",
+          contacts: "Contatos",
+          lastAt: "Último"
+        }
+      },
+      aiAgents: {
+        title: "Agentes de IA",
+        add: "Adicionar agente",
+        hint:
+          "Crie agentes de IA (Claude / Anthropic) que atendem automaticamente os tickets das filas vinculadas. O agente conversa, chama APIs, aciona webhooks e transfere para humano quando necessário.",
+        empty: "Nenhum agente cadastrado.",
+        noQueue: "Nenhuma fila",
+        statusActive: "Ativo",
+        statusInactive: "Inativo",
+        confirmDeleteTitle: "Excluir agente",
+        confirmDeleteMessage:
+          "Tem certeza? As filas vinculadas deixarão de usar este agente.",
+        table: {
+          name: "Nome",
+          model: "Modelo",
+          queues: "Filas",
+          tools: "Ferramentas",
+          active: "Ativo",
+          actions: "Ações"
+        },
+        toasts: {
+          saved: "Agente salvo.",
+          deleted: "Agente excluído."
+        },
+        modal: {
+          addTitle: "Novo agente de IA",
+          editTitle: "Editar agente de IA",
+          invalidName: "Informe um nome com pelo menos 2 caracteres.",
+          name: "Nome",
+          model: "Modelo",
+          modelHint:
+            "Ex.: claude-3-5-sonnet-latest. Use um modelo válido da API da Anthropic.",
+          apiKey: "Chave da API (Anthropic)",
+          apiKeyHint: "Cole a chave sk-ant-... do agente.",
+          apiKeyKeep: "Deixe em branco para manter a chave atual.",
+          maxTokens: "Máx. tokens",
+          temperature: "Temperatura",
+          maxToolSteps: "Máx. passos de ferramenta",
+          active: "Ativo",
+          queues: "Filas atendidas",
+          queuesHint:
+            "O agente responde automaticamente aos tickets destas filas (sem atendente humano atribuído).",
+          systemPrompt: "Instruções (system prompt)",
+          systemPromptHint:
+            "Defina o papel, o tom e as regras do agente. Ele já recebe o contexto do cliente.",
+          toolsTitle: "Ferramentas",
+          toolsHint:
+            "Ferramentas que o agente pode acionar durante o atendimento. HTTP chama uma API, Webhook dispara uma automação (n8n), Transferir passa para um humano.",
+          addHttp: "API HTTP",
+          addWebhook: "Webhook",
+          addTransfer: "Transferir p/ humano",
+          kind: {
+            http: "API HTTP",
+            webhook: "Webhook",
+            transfer: "Transferir p/ humano"
+          },
+          toolName: "Nome da ferramenta",
+          toolNameHint:
+            "Identificador curto, sem espaços (ex.: consulta_os). O modelo usa este nome.",
+          toolDesc: "Descrição",
+          toolDescHint:
+            "Explique quando e para que o agente deve usar esta ferramenta.",
+          event: "Evento do webhook",
+          method: "Método",
+          url: "URL",
+          urlHint: "Pode usar {{parametro}}, {{contact.name}}, {{contact.number}}.",
+          headers: "Headers",
+          addHeader: "Adicionar header",
+          bodyTemplate: "Corpo (JSON) — opcional",
+          bodyTemplateHint:
+            "JSON enviado no POST/PUT/PATCH. Pode usar {{parametro}}.",
+          parameters: "Parâmetros (o agente preenche)",
+          paramName: "Nome",
+          paramType: "Tipo",
+          paramDesc: "Descrição",
+          paramRequired: "Obrigatório",
+          addParam: "Adicionar parâmetro",
+          cancel: "Cancelar",
+          save: "Salvar"
+        }
+      },
+      waUsage: {
+        title: "Custos / Uso (WhatsApp Oficial)",
+        hint:
+          "Contagem de mensagens de serviço (atendimento) enviadas pela API oficial (EvoHub), por número, no mês atual, com custo estimado e limite de envio. A partir de 01/10/2026 a Meta cobra por mensagem.",
+        refresh: "Atualizar",
+        empty: "Nenhuma conexão oficial (EvoHub) cadastrada.",
+        noLimit: "Sem limite",
+        table: {
+          connection: "Conexão",
+          serviceSent: "Serviço enviadas",
+          freeTier: "Franquia grátis",
+          limit: "Limite mensal",
+          billable: "Cobráveis",
+          cost: "Custo estimado",
+          status: "Status",
+          actions: "Ações"
+        },
+        status: {
+          active: "Ativo",
+          blocked: "Bloqueado",
+          released: "Liberado (mês)"
+        },
+        actions: {
+          config: "Configurar limite e preços",
+          block: "Bloquear envio",
+          unblock: "Desbloquear envio"
+        },
+        confirmBlockTitle: "Bloquear envio",
+        confirmBlockMessage:
+          "Isto vai impedir novos envios de atendimento por esta conexão até que você desbloqueie. Confirmar?",
+        config: {
+          title: "Configuração de custo",
+          hint:
+            "Defina o limite mensal de mensagens de serviço, a franquia grátis (Meta: 1.000/mês por número) e o preço por categoria para estimar o custo. Deixe o limite em branco para não limitar.",
+          monthlyLimit: "Limite mensal de mensagens (serviço)",
+          monthlyLimitHint:
+            "Em branco = sem limite. Ao atingir, novos atendimentos ficam bloqueados até o mês virar ou você desbloquear.",
+          freeTier: "Franquia grátis mensal (serviço)",
+          freeTierHint: "Padrão da Meta: 1.000 por número por mês.",
+          priceService: "Preço por mensagem de serviço (R$)",
+          priceMarketing: "Preço por mensagem de marketing (R$)",
+          priceUtility: "Preço por mensagem de utilidade (R$)",
+          priceAuthentication: "Preço por mensagem de autenticação (R$)",
+          cancel: "Cancelar",
+          save: "Salvar"
+        },
+        toasts: {
+          configSaved: "Configuração salva.",
+          blocked: "Envio bloqueado.",
+          unblocked: "Envio liberado."
+        }
+      },
       integrations: {
         title: "Integrações",
         add: "Adicionar webhook",
@@ -279,7 +431,8 @@ const messages = {
           messageReceived: "Mensagem recebida (cliente)",
           messageSent: "Mensagem enviada (atendente)",
           ticketCreated: "Ticket criado",
-          ticketUpdated: "Ticket atualizado (status/fila)"
+          ticketUpdated: "Ticket atualizado (status/fila)",
+          ctwaLead: "Lead de anúncio (Click-to-WhatsApp)"
         },
         toasts: {
           success: "Webhook salvo com sucesso.",
@@ -620,6 +773,9 @@ const messages = {
           messagesAPI: "API",
           waApi: "WA API",
           integrations: "Integrações",
+          waUsage: "Custos / Uso",
+          aiAgents: "Agentes de IA",
+          ctwaReport: "Leads (Click-to-WhatsApp)",
           schedules: "Agendamentos",
           campaigns: "Campanhas",
           annoucements: "Informativos",
@@ -1438,6 +1594,8 @@ const messages = {
           "Erro de autenticação. Por favor, tente novamente.",
         ERR_SENDING_WAPP_MSG:
           "Erro ao enviar mensagem do WhatsApp. Verifique a página de conexões.",
+        ERR_WA_OFFICIAL_LIMIT_REACHED:
+          "Envio bloqueado: o limite mensal de mensagens desta conexão oficial foi atingido (ou está bloqueado manualmente). Libere em Custos / Uso.",
         ERR_DELETE_WAPP_MSG: "Não foi possível excluir a mensagem do WhatsApp.",
         ERR_EDITING_WAPP_MSG: "Não foi possível editar a mensagem do WhatsApp.",
         ERR_OTHER_OPEN_TICKET: "Já existe um tíquete aberto para este contato.",

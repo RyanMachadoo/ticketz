@@ -17,6 +17,9 @@ import Tags from "../pages/Tags/";
 import MessagesAPI from "../pages/MessagesAPI/";
 import WhatsappTemplates from "../pages/WhatsappTemplates/";
 import Integrations from "../pages/Integrations/";
+import WaUsage from "../pages/WaUsage/";
+import AIAgents from "../pages/AIAgents/";
+import CtwaReport from "../pages/CtwaReport/";
 import Helps from "../pages/Helps/";
 import ContactLists from "../pages/ContactLists/";
 import ContactListItems from "../pages/ContactListItems/";
@@ -101,6 +104,24 @@ const Routes = () => {
                   exact
                   path="/integrations"
                   component={Integrations}
+                  isPrivate
+                />
+                <Route
+                  exact
+                  path="/wa-usage"
+                  component={WaUsage}
+                  isPrivate
+                />
+                <Route
+                  exact
+                  path="/ai-agents"
+                  component={AIAgents}
+                  isPrivate
+                />
+                <Route
+                  exact
+                  path="/ctwa-report"
+                  component={CtwaReport}
                   isPrivate
                 />
                 <Route

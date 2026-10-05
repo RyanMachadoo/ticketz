@@ -5,6 +5,8 @@ import Message from "../models/Message";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../services/TicketServices/FindOrCreateTicketService";
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
+import { saveReferral } from "../services/CtwaServices/CtwaService";
+import { dispatchWebhookEvent } from "../services/WebhookServices/DispatchWebhook";
 
 /**
  * Processa em background os eventos recebidos do EvoHub (Cloud API oficial).
@@ -144,6 +146,28 @@ evoHubInboundQueue.process(async job => {
         },
         companyId
       });
+
+      // Atribuição Click-to-WhatsApp: se a mensagem veio de um clique em anúncio,
+      // a Meta manda um objeto `referral`. Salva de qual anúncio veio (1 por
+      // ticket) e dispara o webhook ctwa.lead (automações no n8n). Best-effort.
+      if (msg.referral) {
+        const saved = await saveReferral(msg.referral, {
+          companyId,
+          ticketId: ticket.id,
+          contactId: contact.id,
+          whatsappId: whatsapp.id
+        });
+        if (saved?.created) {
+          logger.info(
+            `[CTWA] lead do anúncio ${msg.referral.source_id || "?"} (ticket=${ticket.id})`
+          );
+          dispatchWebhookEvent(companyId, "ctwa.lead", {
+            ticketId: ticket.id,
+            contact: { id: contact.id, name: contact.name, number: contact.number },
+            referral: msg.referral
+          });
+        }
+      }
     }
 
     // 2) STATUS de mensagens enviadas (sent/delivered/read/failed) -> ack

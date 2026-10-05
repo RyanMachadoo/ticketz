@@ -23,6 +23,7 @@ import Whatsapp from "./Whatsapp";
 import WhatsappQueue from "./WhatsappQueue";
 import QueueOption from "./QueueOption";
 import Ticket from "./Ticket";
+import AIAgent from "./AIAgent";
 import { OpenHoursData } from "../helpers/checkOpenHours";
 
 @Table
@@ -89,6 +90,14 @@ class Queue extends Model {
 
   @HasMany(() => Ticket)
   tickets: Ticket[];
+
+  // Agente de IA que atende automaticamente os tickets desta fila (opcional).
+  @ForeignKey(() => AIAgent)
+  @Column
+  aiAgentId: number;
+
+  @BelongsTo(() => AIAgent)
+  aiAgent: AIAgent;
 }
 
 export default Queue;

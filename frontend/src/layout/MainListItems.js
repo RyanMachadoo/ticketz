@@ -33,6 +33,9 @@ import LoyaltyRoundedIcon from "@material-ui/icons/LoyaltyRounded";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import ForumIcon from "@material-ui/icons/Forum";
 import LocalAtmIcon from "@material-ui/icons/LocalAtm";
+import MonetizationOnIcon from "@material-ui/icons/MonetizationOn";
+import SmartToyIcon from "@material-ui/icons/Android";
+import AdsClickIcon from "@material-ui/icons/TrendingUp";
 import RotateRight from "@material-ui/icons/RotateRight";
 import { i18n } from "../translate/i18n";
 import BorderColorIcon from "@material-ui/icons/BorderColor";
@@ -461,6 +464,21 @@ const MainListItems = props => {
               to="/integrations"
               primary={i18n.t("mainDrawer.listItems.integrations")}
               icon={<SettingsInputComponentIcon />}
+            />
+            <ListItemLink
+              to="/wa-usage"
+              primary={i18n.t("mainDrawer.listItems.waUsage")}
+              icon={<MonetizationOnIcon />}
+            />
+            <ListItemLink
+              to="/ai-agents"
+              primary={i18n.t("mainDrawer.listItems.aiAgents")}
+              icon={<SmartToyIcon />}
+            />
+            <ListItemLink
+              to="/ctwa-report"
+              primary={i18n.t("mainDrawer.listItems.ctwaReport")}
+              icon={<AdsClickIcon />}
             />
             <ListItemLink
               to="/financeiro"

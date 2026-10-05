@@ -7,6 +7,7 @@ import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
 import { dispatchWebhookEvent } from "../WebhookServices/DispatchWebhook";
+import { maybeEnqueueAgent } from "../../queues/AgentQueue";
 
 interface MessageData {
   id: string;
@@ -141,6 +142,10 @@ const CreateMessageService = async ({
     message.fromMe ? "message.sent" : "message.received",
     message
   );
+
+  // Agente de IA: se a fila do ticket tem um agente vinculado e a mensagem é do
+  // cliente, enfileira a resposta. Fire-and-forget; nunca quebra o fluxo.
+  maybeEnqueueAgent(message);
 
   return message;
 };

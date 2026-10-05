@@ -144,6 +144,42 @@ class Whatsapp extends Model<Whatsapp> {
 
   @Column(DataType.TEXT)
   evohubWabaId: string;
+
+  // ===== Controle de custo/uso do canal oficial =====
+  // Limite mensal de mensagens de SERVIÇO (atendimento). null = sem limite.
+  @Column
+  serviceMonthlyLimit: number;
+
+  // Franquia grátis mensal de mensagens de serviço (Meta: 1.000/mês por número).
+  @Default(1000)
+  @Column
+  serviceFreeTier: number;
+
+  // Preços por categoria (R$ por mensagem), para estimar custo.
+  @Default(0)
+  @Column(DataType.DECIMAL(10, 4))
+  priceService: number;
+
+  @Default(0)
+  @Column(DataType.DECIMAL(10, 4))
+  priceMarketing: number;
+
+  @Default(0)
+  @Column(DataType.DECIMAL(10, 4))
+  priceUtility: number;
+
+  @Default(0)
+  @Column(DataType.DECIMAL(10, 4))
+  priceAuthentication: number;
+
+  // Bloqueio manual do envio (ligado/desligado pelo admin).
+  @Default(false)
+  @Column
+  usageManualBlock: boolean;
+
+  // Período (YYYY-MM) em que o admin liberou o envio mesmo acima do limite.
+  @Column(DataType.STRING)
+  usageOverridePeriod: string;
 }
 
 export default Whatsapp;

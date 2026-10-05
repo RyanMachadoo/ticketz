@@ -47,7 +47,8 @@ export const WEBHOOK_EVENTS = [
   { value: "message.received", labelKey: "messageReceived" },
   { value: "message.sent", labelKey: "messageSent" },
   { value: "ticket.created", labelKey: "ticketCreated" },
-  { value: "ticket.updated", labelKey: "ticketUpdated" }
+  { value: "ticket.updated", labelKey: "ticketUpdated" },
+  { value: "ctwa.lead", labelKey: "ctwaLead" }
 ];
 
 const WebhookSchema = Yup.object().shape({

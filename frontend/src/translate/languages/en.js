@@ -243,6 +243,156 @@ const messages = {
       internalChat: {
         title: "Internal Chat"
       },
+      ctwaReport: {
+        title: "Click-to-WhatsApp Leads",
+        hint:
+          "Shows which Click-to-WhatsApp ad each conversation came from (attribution captured from the official API). The origin is also available to the AI agent and to webhooks (ctwa.lead event).",
+        apply: "Apply",
+        startDate: "From",
+        endDate: "To",
+        totalLeads: "Total leads",
+        empty: "No ad leads in the period.",
+        noHeadline: "(no title)",
+        table: {
+          ad: "Ad",
+          adId: "Ad ID",
+          type: "Source",
+          leads: "Leads",
+          contacts: "Contacts",
+          lastAt: "Last"
+        }
+      },
+      aiAgents: {
+        title: "AI Agents",
+        add: "Add agent",
+        hint:
+          "Create AI agents (Claude / Anthropic) that automatically handle tickets in the linked queues. The agent chats, calls APIs, triggers webhooks and transfers to a human when needed.",
+        empty: "No agents registered.",
+        noQueue: "No queue",
+        statusActive: "Active",
+        statusInactive: "Inactive",
+        confirmDeleteTitle: "Delete agent",
+        confirmDeleteMessage:
+          "Are you sure? Linked queues will stop using this agent.",
+        table: {
+          name: "Name",
+          model: "Model",
+          queues: "Queues",
+          tools: "Tools",
+          active: "Active",
+          actions: "Actions"
+        },
+        toasts: {
+          saved: "Agent saved.",
+          deleted: "Agent deleted."
+        },
+        modal: {
+          addTitle: "New AI agent",
+          editTitle: "Edit AI agent",
+          invalidName: "Enter a name with at least 2 characters.",
+          name: "Name",
+          model: "Model",
+          modelHint:
+            "E.g. claude-3-5-sonnet-latest. Use a valid Anthropic API model.",
+          apiKey: "API key (Anthropic)",
+          apiKeyHint: "Paste the agent's sk-ant-... key.",
+          apiKeyKeep: "Leave blank to keep the current key.",
+          maxTokens: "Max tokens",
+          temperature: "Temperature",
+          maxToolSteps: "Max tool steps",
+          active: "Active",
+          queues: "Served queues",
+          queuesHint:
+            "The agent auto-replies to tickets in these queues (with no human assigned).",
+          systemPrompt: "Instructions (system prompt)",
+          systemPromptHint:
+            "Define the agent's role, tone and rules. It already receives the customer context.",
+          toolsTitle: "Tools",
+          toolsHint:
+            "Tools the agent can trigger. HTTP calls an API, Webhook fires an automation (n8n), Transfer hands off to a human.",
+          addHttp: "HTTP API",
+          addWebhook: "Webhook",
+          addTransfer: "Transfer to human",
+          kind: {
+            http: "HTTP API",
+            webhook: "Webhook",
+            transfer: "Transfer to human"
+          },
+          toolName: "Tool name",
+          toolNameHint:
+            "Short identifier, no spaces (e.g. lookup_order). The model uses this name.",
+          toolDesc: "Description",
+          toolDescHint: "Explain when and why the agent should use this tool.",
+          event: "Webhook event",
+          method: "Method",
+          url: "URL",
+          urlHint: "You can use {{param}}, {{contact.name}}, {{contact.number}}.",
+          headers: "Headers",
+          addHeader: "Add header",
+          bodyTemplate: "Body (JSON) — optional",
+          bodyTemplateHint: "JSON sent on POST/PUT/PATCH. You can use {{param}}.",
+          parameters: "Parameters (filled by the agent)",
+          paramName: "Name",
+          paramType: "Type",
+          paramDesc: "Description",
+          paramRequired: "Required",
+          addParam: "Add parameter",
+          cancel: "Cancel",
+          save: "Save"
+        }
+      },
+      waUsage: {
+        title: "Costs / Usage (Official WhatsApp)",
+        hint:
+          "Count of service (support) messages sent through the official API (EvoHub), per number, in the current month, with estimated cost and a sending limit. From 2026-10-01 Meta charges per message.",
+        refresh: "Refresh",
+        empty: "No official (EvoHub) connection registered.",
+        noLimit: "No limit",
+        table: {
+          connection: "Connection",
+          serviceSent: "Service sent",
+          freeTier: "Free tier",
+          limit: "Monthly limit",
+          billable: "Billable",
+          cost: "Estimated cost",
+          status: "Status",
+          actions: "Actions"
+        },
+        status: {
+          active: "Active",
+          blocked: "Blocked",
+          released: "Released (month)"
+        },
+        actions: {
+          config: "Configure limit and prices",
+          block: "Block sending",
+          unblock: "Unblock sending"
+        },
+        confirmBlockTitle: "Block sending",
+        confirmBlockMessage:
+          "This will prevent new support messages from this connection until you unblock it. Confirm?",
+        config: {
+          title: "Cost settings",
+          hint:
+            "Set the monthly service message limit, the free tier (Meta: 1,000/month per number) and the price per category to estimate cost. Leave the limit blank for no limit.",
+          monthlyLimit: "Monthly message limit (service)",
+          monthlyLimitHint:
+            "Blank = no limit. When reached, new support messages are blocked until the month rolls over or you unblock.",
+          freeTier: "Monthly free tier (service)",
+          freeTierHint: "Meta default: 1,000 per number per month.",
+          priceService: "Price per service message (R$)",
+          priceMarketing: "Price per marketing message (R$)",
+          priceUtility: "Price per utility message (R$)",
+          priceAuthentication: "Price per authentication message (R$)",
+          cancel: "Cancel",
+          save: "Save"
+        },
+        toasts: {
+          configSaved: "Settings saved.",
+          blocked: "Sending blocked.",
+          unblocked: "Sending released."
+        }
+      },
       integrations: {
         title: "Integrations",
         add: "Add webhook",
@@ -280,7 +430,8 @@ const messages = {
           messageReceived: "Message received (contact)",
           messageSent: "Message sent (agent)",
           ticketCreated: "Ticket created",
-          ticketUpdated: "Ticket updated (status/queue)"
+          ticketUpdated: "Ticket updated (status/queue)",
+          ctwaLead: "Ad lead (Click-to-WhatsApp)"
         },
         toasts: {
           success: "Webhook saved successfully.",
@@ -622,6 +773,9 @@ const messages = {
           messagesAPI: "API",
           waApi: "WA API",
           integrations: "Integrations",
+          waUsage: "Costs / Usage",
+          aiAgents: "AI Agents",
+          ctwaReport: "Leads (Click-to-WhatsApp)",
           schedules: "Schedules",
           campaigns: "Campaigns",
           annoucements: "Announcements",
@@ -1433,6 +1587,8 @@ const messages = {
         ERR_INVALID_CREDENTIALS: "Authentication error. Please try again.",
         ERR_SENDING_WAPP_MSG:
           "Error sending WhatsApp message. Check the connections page.",
+        ERR_WA_OFFICIAL_LIMIT_REACHED:
+          "Sending blocked: this official connection reached its monthly message limit (or is manually blocked). Release it under Costs / Usage.",
         ERR_DELETE_WAPP_MSG: "Could not delete WhatsApp message.",
         ERR_EDITING_WAPP_MSG: "Could not edit WhatsApp message.",
         ERR_OTHER_OPEN_TICKET:

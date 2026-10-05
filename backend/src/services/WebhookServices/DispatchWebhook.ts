@@ -7,13 +7,15 @@ export type WebhookEvent =
   | "message.received"
   | "message.sent"
   | "ticket.created"
-  | "ticket.updated";
+  | "ticket.updated"
+  | "ctwa.lead";
 
 export const WEBHOOK_EVENTS: WebhookEvent[] = [
   "message.received",
   "message.sent",
   "ticket.created",
-  "ticket.updated"
+  "ticket.updated",
+  "ctwa.lead"
 ];
 
 const toPlain = (entity: any): any => {

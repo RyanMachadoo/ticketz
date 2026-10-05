@@ -87,6 +87,11 @@ class Ticket extends Model<Ticket> {
   @Column
   chatbot: boolean;
 
+  // Agente de IA conduzindo o ticket. null/true = pode responder; false = parou
+  // (transferido para humano ou atendente assumiu).
+  @Column
+  useAgent: boolean;
+
   @ForeignKey(() => QueueOption)
   @Column
   queueOptionId: number;

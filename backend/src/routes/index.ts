@@ -37,6 +37,9 @@ import dockerRoutes from "./dockerRoutes";
 import evoHubRoutes from "./evoHubRoutes";
 import waApiRoutes from "./waApiRoutes";
 import webhookRoutes from "./webhookRoutes";
+import waUsageRoutes from "./waUsageRoutes";
+import aiAgentRoutes from "./aiAgentRoutes";
+import ctwaRoutes from "./ctwaRoutes";
 
 const routes = Router();
 
@@ -46,6 +49,9 @@ routes.use(settingRoutes);
 routes.use(evoHubRoutes);
 routes.use(waApiRoutes);
 routes.use(webhookRoutes);
+routes.use(waUsageRoutes);
+routes.use(aiAgentRoutes);
+routes.use(ctwaRoutes);
 routes.use(contactRoutes);
 routes.use(ticketRoutes);
 routes.use(buildCaptureExtensionRoutes);
