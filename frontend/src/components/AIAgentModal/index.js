@@ -85,6 +85,7 @@ const newTool = kind => {
 const defaultForm = {
   name: "",
   apiKey: "",
+  anthropicWorkspaceId: "",
   model: "claude-3-5-sonnet-latest",
   maxTokens: 1024,
   temperature: 0.7,
@@ -123,6 +124,7 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
           setForm({
             name: data.name || "",
             apiKey: "",
+            anthropicWorkspaceId: data.anthropicWorkspaceId || "",
             model: data.model || "claude-3-5-sonnet-latest",
             maxTokens: data.maxTokens || 1024,
             temperature:
@@ -213,7 +215,10 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         tools: form.tools,
         queueIds: form.queueIds,
         transferQueueId:
-          form.transferQueueId === "" ? null : Number(form.transferQueueId)
+          form.transferQueueId === "" ? null : Number(form.transferQueueId),
+        anthropicWorkspaceId: form.anthropicWorkspaceId
+          ? form.anthropicWorkspaceId.trim()
+          : null
       };
       // Só envia a chave se o usuário digitou uma nova.
       if (form.apiKey && form.apiKey.trim()) {
@@ -465,6 +470,17 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
               margin="dense"
               type="password"
               placeholder={hasApiKey ? "••••••••" : ""}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label={i18n.t("aiAgents.modal.workspaceId")}
+              helperText={i18n.t("aiAgents.modal.workspaceIdHint")}
+              value={form.anthropicWorkspaceId}
+              onChange={e => setField("anthropicWorkspaceId", e.target.value)}
+              fullWidth
+              margin="dense"
+              placeholder="ex.: 9d1f... (deixe vazio se a key for de workspace)"
             />
           </Grid>
           <Grid item xs={6} sm={3}>

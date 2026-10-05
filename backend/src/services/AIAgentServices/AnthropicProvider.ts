@@ -37,6 +37,7 @@ export interface AnthropicCallParams {
   system: string;
   messages: AnthropicMessage[];
   tools?: AnthropicTool[];
+  workspaceId?: string;
 }
 
 export interface AnthropicResponse {
@@ -49,8 +50,16 @@ export interface AnthropicResponse {
 export async function callMessages(
   params: AnthropicCallParams
 ): Promise<AnthropicResponse> {
-  const { apiKey, model, maxTokens, temperature, system, messages, tools } =
-    params;
+  const {
+    apiKey,
+    model,
+    maxTokens,
+    temperature,
+    system,
+    messages,
+    tools,
+    workspaceId
+  } = params;
 
   if (!apiKey) {
     throw new Error("[Agente IA] chave da API da Anthropic ausente");
@@ -65,12 +74,18 @@ export async function callMessages(
   if (system) body.system = system;
   if (tools && tools.length) body.tools = tools;
 
+  const headers: Record<string, string> = {
+    "x-api-key": apiKey,
+    "anthropic-version": ANTHROPIC_VERSION,
+    "content-type": "application/json"
+  };
+  // Necessário quando a key é da organização (não escopada a um workspace).
+  if (workspaceId) {
+    headers["anthropic-workspace-id"] = workspaceId;
+  }
+
   const { data } = await axios.post(ANTHROPIC_URL, body, {
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-      "content-type": "application/json"
-    },
+    headers,
     timeout: 60000
   });
 

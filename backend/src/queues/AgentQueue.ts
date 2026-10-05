@@ -12,11 +12,16 @@ import handleAgentReply from "../services/AIAgentServices/HandleAgentReply";
 const redisConnection =
   process.env.REDIS_URI || process.env.IO_REDIS_SERVER || "";
 
+// Debounce: junta mensagens em rajada (cliente mandando várias linhas seguidas)
+// numa resposta só, mais natural e mais barato. O job espera este tempo e, ao
+// rodar, lê TODO o histórico — então enxerga todas as mensagens do período.
+const DEBOUNCE_MS = Number(process.env.AGENT_DEBOUNCE_MS || 8000);
+
 export const agentQueue = new Bull("AIAgentQueue", redisConnection, {
   defaultJobOptions: {
     attempts: 1, // não repetir: evita respostas duplicadas se algo falhar no meio
-    removeOnComplete: 1000,
-    removeOnFail: 1000
+    removeOnComplete: true,
+    removeOnFail: true
   }
 });
 
@@ -53,12 +58,9 @@ export function maybeEnqueueAgent(message: Message): void {
       logger.info(`[Agente IA] ticket=${ticket.id} NÃO atua: ticket fechado.`);
       return;
     }
-    if (ticket.userId) {
-      logger.info(
-        `[Agente IA] ticket=${ticket.id} NÃO atua: atendente humano já assumiu (userId=${ticket.userId}).`
-      );
-      return;
-    }
+    // Obs.: NÃO bloqueamos por userId. O controle é pela FILA: enquanto o ticket
+    // estiver na fila do agente (e useAgent != false), o agente responde. Para
+    // parar, transfira para outra fila (ou desligue com useAgent=false).
     if (ticket.useAgent === false) {
       logger.info(
         `[Agente IA] ticket=${ticket.id} NÃO atua: já transferido/desligado (useAgent=false).`
@@ -66,13 +68,16 @@ export function maybeEnqueueAgent(message: Message): void {
       return;
     }
 
+    // jobId por "janela de tempo": mensagens do mesmo intervalo colapsam num
+    // único job (debounce). Ao rodar, o handler lê todo o histórico.
+    const bucket = Math.floor(Date.now() / DEBOUNCE_MS);
     logger.info(
-      `[Agente IA] ticket=${ticket.id} VAI responder (fila=${ticket.queue.name || ticket.queueId}, agenteId=${ticket.queue.aiAgentId}).`
+      `[Agente IA] ticket=${ticket.id} agendado (debounce ${DEBOUNCE_MS}ms, fila=${ticket.queue.name || ticket.queueId}, agenteId=${ticket.queue.aiAgentId}).`
     );
     agentQueue
       .add(
         { ticketId: ticket.id, companyId: message.companyId },
-        { jobId: `agent-${ticket.id}-${message.id}` }
+        { jobId: `agent-${ticket.id}-${bucket}`, delay: DEBOUNCE_MS }
       )
       .catch(err => {
         logger.error(

@@ -57,6 +57,11 @@ class AIAgent extends Model<AIAgent> {
   @Column(DataType.TEXT)
   apiKey: string;
 
+  // Workspace ID da Anthropic (opcional). Preencha quando a key for da
+  // organização; com key de workspace, deixe vazio.
+  @Column(DataType.STRING)
+  anthropicWorkspaceId: string;
+
   @Default("claude-3-5-sonnet-latest")
   @Column(DataType.STRING)
   model: string;

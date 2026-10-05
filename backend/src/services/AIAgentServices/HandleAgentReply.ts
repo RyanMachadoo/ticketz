@@ -87,9 +87,9 @@ export async function handleAgentReply(
   try {
     const ticket = await Ticket.findByPk(ticketId);
     if (!ticket || ticket.companyId !== companyId) return;
-    if (ticket.useAgent === false) return; // atendente assumiu / já transferido
+    if (ticket.useAgent === false) return; // transferido / desligado
     if (ticket.status === "closed") return;
-    if (ticket.userId) return; // humano assumiu
+    // Controle é pela fila (não por userId): atua enquanto estiver na fila do agente.
     if (!ticket.queueId) return;
 
     const queue = await Queue.findByPk(ticket.queueId);
@@ -157,12 +157,18 @@ export async function handleAgentReply(
         temperature: Number(agent.temperature),
         system: systemPrompt,
         messages,
-        tools
+        tools,
+        workspaceId: agent.anthropicWorkspaceId || undefined
       });
 
       const toolUses = extractToolUses(resp.content);
 
       if (resp.stopReason === "tool_use" && toolUses.length) {
+        logger.info(
+          `[Agente IA] ticket=${ticketId} passo ${step}: modelo pediu ${
+            toolUses.length
+          } ferramenta(s): ${toolUses.map(t => t.name).join(", ")}`
+        );
         // Registra a vez do assistente (com os pedidos de ferramenta).
         messages.push({ role: "assistant", content: resp.content });
 
@@ -184,6 +190,26 @@ export async function handleAgentReply(
       } else {
         finalText = extractText(resp.content);
         break;
+      }
+    }
+
+    // Rede de segurança: se o loop acabou ainda pedindo ferramenta (estourou o
+    // limite de passos) e não temos texto, faz UMA chamada final SEM ferramentas
+    // para o modelo concluir em texto — assim o cliente nunca fica sem resposta.
+    if (!finalText) {
+      try {
+        const closing = await callMessages({
+          apiKey: agent.apiKey,
+          model: agent.model,
+          maxTokens: agent.maxTokens,
+          temperature: Number(agent.temperature),
+          system: systemPrompt,
+          messages,
+          workspaceId: agent.anthropicWorkspaceId || undefined
+        });
+        finalText = extractText(closing.content);
+      } catch (e) {
+        describeAnthropicError(e);
       }
     }
 

@@ -88,6 +88,22 @@ export async function getOrCreateHumanQueue(
 
 const TRANSFER_TOOL_NAME = "transferir_atendimento";
 
+/**
+ * A Anthropic exige nome de ferramenta no padrão ^[a-zA-Z0-9_-]{1,128}$.
+ * Sanitizamos (remove acentos/espaços/símbolos) para nunca dar 400 — e usamos
+ * a MESMA função ao enviar e ao localizar a ferramenta, mantendo o casamento.
+ */
+export function sanitizeToolName(name: string): string {
+  const base = (name || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_-]+|[_-]+$/g, "")
+    .slice(0, 128);
+  return base || "ferramenta";
+}
+
 const jsonTypeOf = (t?: string): string => {
   const v = (t || "string").toLowerCase();
   if (["number", "integer", "boolean"].includes(v)) return v;
@@ -115,7 +131,7 @@ function transferToolDef(description?: string): AnthropicTool {
     name: TRANSFER_TOOL_NAME,
     description:
       description ||
-      "Transfere o atendimento para um atendente humano. Use quando o cliente pedir uma pessoa, entrar em negociação de preço/desconto/financiamento/avaliação de troca, quiser fechar/reservar, em pós-venda/oficina/reclamação, ou quando você não puder resolver. Ao usar, o atendimento SAI da sua fila e você para de responder.",
+      "Transfere o atendimento para um atendente humano. CHAME esta ferramenta (não apenas prometa que vai transferir) quando: o cliente AGENDAR/confirmar uma visita ou test drive (passe para um vendedor confirmar); pedir para falar com uma pessoa; entrar em negociação de preço/desconto/financiamento/avaliação de troca; quiser fechar/reservar/pagar; for pós-venda/oficina/garantia/reclamação; ou quando você não conseguir resolver ou a ferramenta de consulta falhar. Importante: se você disser ao cliente que vai transferir, você DEVE chamar esta ferramenta na mesma resposta. Ao usar, o atendimento SAI da sua fila e você para de responder.",
     input_schema: {
       type: "object",
       properties: {
@@ -152,7 +168,7 @@ export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
     }
     if (!t.name) return;
     result.push({
-      name: t.name,
+      name: sanitizeToolName(t.name),
       description: t.description || "",
       input_schema: buildInputSchema(t.parameters)
     });
@@ -212,12 +228,21 @@ export async function executeTool(
   agentTools: any[],
   ctx: AgentToolContext
 ): Promise<ToolExecutionResult> {
+  logger.info(
+    `[Agente IA] ticket=${ctx.ticketId} chamando ferramenta '${toolName}' input=${JSON.stringify(
+      input || {}
+    ).slice(0, 500)}`
+  );
+
   // Transferência (nativa)
   if (toolName === TRANSFER_TOOL_NAME) {
     return executeTransfer(input, ctx);
   }
 
-  const def = (agentTools || []).find(t => t?.name === toolName);
+  // Casa pelo nome sanitizado (o modelo devolve o nome já sanitizado).
+  const def = (agentTools || []).find(
+    t => t?.name && sanitizeToolName(t.name) === toolName
+  );
   if (!def) {
     return { content: `Ferramenta '${toolName}' não encontrada.`, isError: true };
   }
@@ -262,6 +287,7 @@ export async function executeTool(
         }
       }
 
+      const startedAt = Date.now();
       const resp = await axios.request({
         url,
         method: method as any,
@@ -271,11 +297,30 @@ export async function executeTool(
         validateStatus: () => true, // não lança em 4xx/5xx; devolve ao modelo
         maxContentLength: 1_000_000
       });
+      const ms = Date.now() - startedAt;
+
+      const contentType = String(
+        resp.headers?.["content-type"] || resp.headers?.["Content-Type"] || ""
+      );
+      logger.info(
+        `[Agente IA] ferramenta '${toolName}' HTTP ${method} ${url} -> ${resp.status} (${ms}ms, ${contentType || "?"})`
+      );
 
       const payload =
         typeof resp.data === "string"
           ? resp.data
           : JSON.stringify(resp.data);
+
+      // Dica ao modelo quando a URL devolve página HTML (site) em vez de API JSON.
+      if (contentType.includes("text/html")) {
+        return {
+          content: truncate(
+            `A URL retornou uma página HTML (não uma API). Informe que não foi possível consultar automaticamente e peça para transferir ou tente outra ferramenta. Status HTTP ${resp.status}.`
+          ),
+          isError: true
+        };
+      }
+
       return {
         content: truncate(`HTTP ${resp.status}: ${payload}`),
         isError: resp.status >= 400

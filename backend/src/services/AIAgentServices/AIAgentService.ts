@@ -10,6 +10,7 @@ import Queue from "../../models/Queue";
 export interface AIAgentData {
   name?: string;
   apiKey?: string;
+  anthropicWorkspaceId?: string | null;
   model?: string;
   maxTokens?: number;
   temperature?: number;
@@ -116,6 +117,7 @@ export async function createAgent(
     companyId,
     name: data.name.trim(),
     apiKey: data.apiKey || null,
+    anthropicWorkspaceId: data.anthropicWorkspaceId || null,
     model: data.model || "claude-3-5-sonnet-latest",
     maxTokens: data.maxTokens ? Number(data.maxTokens) : 1024,
     temperature: clampTemp(data.temperature, 0.7),
@@ -145,6 +147,10 @@ export async function updateAgent(
 
   const patch: any = {
     name: data.name !== undefined ? data.name.trim() : agent.name,
+    anthropicWorkspaceId:
+      data.anthropicWorkspaceId === undefined
+        ? agent.anthropicWorkspaceId
+        : data.anthropicWorkspaceId || null,
     model: data.model !== undefined ? data.model : agent.model,
     maxTokens:
       data.maxTokens !== undefined ? Number(data.maxTokens) : agent.maxTokens,

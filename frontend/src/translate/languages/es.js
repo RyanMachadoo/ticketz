@@ -294,6 +294,9 @@ const messages = {
             "Ej.: claude-3-5-sonnet-latest. Use un modelo válido de la API de Anthropic.",
           apiKey: "Clave de API (Anthropic)",
           apiKeyHint: "Pegue la clave sk-ant-... del agente.",
+          workspaceId: "Workspace ID de Anthropic (opcional)",
+          workspaceIdHint:
+            "Complete solo si la clave es de la ORGANIZACIÓN. Lo más simple es generar una API key dentro de un Workspace en la Anthropic Console y dejar esto vacío.",
           apiKeyKeep: "Deje en blanco para mantener la clave actual.",
           maxTokens: "Máx. tokens",
           temperature: "Temperatura",
