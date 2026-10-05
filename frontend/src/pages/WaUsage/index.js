@@ -140,7 +140,14 @@ const WaUsage = () => {
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
     if (!companyId || !socketManager) return undefined;
-    const socket = socketManager.getSocket(companyId);
+    // O SocketContext expõe GetSocket (G maiúsculo). Chamar getSocket
+    // (inexistente) lançava TypeError e deixava a tela toda branca.
+    const getSocketFn =
+      socketManager.GetSocket || socketManager.getSocket;
+    const socket =
+      typeof getSocketFn === "function"
+        ? getSocketFn.call(socketManager, companyId)
+        : null;
     if (!socket) return undefined;
 
     const handler = data => {
