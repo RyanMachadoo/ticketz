@@ -16,16 +16,30 @@ import {
 import {
   AgentToolContext,
   buildAnthropicTools,
-  executeTool
+  executeTool,
+  findToolDef
 } from "./AgentToolRunner";
+import {
+  loadMemory,
+  formatMemoryForPrompt
+} from "./AgentMemoryService";
+import {
+  normalizeGuardrails,
+  checkToolCall,
+  maskPiiInput
+} from "./AgentGuardrails";
+import { recordTrace, TraceToolCall } from "./AgentTraceService";
 
 /**
- * Orquestra uma resposta do agente de IA para um ticket:
+ * Orquestra uma resposta do agente de IA para um ticket (estilo ADK):
  *  1) carrega o agente vinculado à fila do ticket;
- *  2) monta o histórico da conversa;
- *  3) chama a API da Anthropic com as ferramentas;
- *  4) executa as ferramentas pedidas (loop) até a resposta final;
- *  5) envia a resposta final ao cliente pelo canal do ticket.
+ *  2) carrega a MEMÓRIA (sessão + longo prazo) e injeta no contexto;
+ *  3) monta o histórico da conversa;
+ *  4) chama a API da Anthropic com as ferramentas;
+ *  5) aplica GUARDRAILS determinísticos antes de cada ferramenta;
+ *  6) executa as ferramentas pedidas (loop) até a resposta final;
+ *  7) envia a resposta final ao cliente pelo canal do ticket;
+ *  8) grava um TRACE (raio-x) do turno: tokens, custo, latência, trajetória.
  *
  * Tudo protegido por try/catch — uma falha do agente NUNCA quebra o atendimento.
  */
@@ -84,6 +98,22 @@ export async function handleAgentReply(
   }
   runningTickets.add(ticketId);
 
+  // Acumuladores de telemetria (viram um AgentTrace no fim).
+  const turnStart = Date.now();
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let steps = 0;
+  const toolCalls: TraceToolCall[] = [];
+  const guardrailEvents: any[] = [];
+  let lastStopReason = "";
+  let traceAgentId = 0;
+  let traceModel = "";
+  let traceStatus = "ok";
+  let traceError = "";
+  let finalText = "";
+  let transferred = false;
+  let shouldTrace = false;
+
   try {
     const ticket = await Ticket.findByPk(ticketId);
     if (!ticket || ticket.companyId !== companyId) return;
@@ -104,9 +134,19 @@ export async function handleAgentReply(
       return;
     }
 
+    // A partir daqui é um turno "de verdade": vamos gravar trace no fim.
+    shouldTrace = true;
+    traceAgentId = agent.id;
+    traceModel = agent.model;
+
     const fullTicket = await ShowTicketService(ticketId, companyId);
+    const contactId = fullTicket.contactId || fullTicket.contact?.id || null;
     const contactName = fullTicket.contact?.name || "";
     const contactNumber = fullTicket.contact?.number || "";
+
+    // Memória (sessão + longo prazo) para personalizar e não repetir perguntas.
+    const memory = await loadMemory(companyId, ticketId, contactId);
+    const memoryLine = formatMemoryForPrompt(memory);
 
     // Origem Click-to-WhatsApp: se a conversa veio de um anúncio, dá esse
     // contexto ao agente (ele pode personalizar a abordagem pelo anúncio).
@@ -129,13 +169,18 @@ export async function handleAgentReply(
         contactName || "um cliente"
       }${contactNumber ? ` (${contactNumber})` : ""} pelo WhatsApp.`,
       ctwaLine,
-      "Responda em português do Brasil, de forma objetiva e cordial. Use as ferramentas disponíveis quando precisar consultar dados ou executar ações. Transfira para um humano quando não puder resolver."
-    ].join("\n");
+      memoryLine,
+      "Responda em português do Brasil, de forma objetiva e cordial. Use as ferramentas disponíveis quando precisar consultar dados ou executar ações. Anote na memória (anotar_memoria) os fatos úteis para não repetir perguntas. Transfira para um humano quando não puder resolver."
+    ]
+      .filter(Boolean)
+      .join("\n");
 
+    const guardrails = normalizeGuardrails(agent.guardrails);
     const tools = buildAnthropicTools(agent.tools || []);
     const ctx: AgentToolContext = {
       companyId,
       ticketId,
+      contactId,
       contactName,
       contactNumber,
       transferQueueId: agent.transferQueueId || null
@@ -145,10 +190,9 @@ export async function handleAgentReply(
     if (!messages.length) return;
 
     const maxSteps = agent.maxToolSteps || 5;
-    let finalText = "";
-    let transferred = false;
 
     for (let step = 0; step <= maxSteps; step += 1) {
+      steps += 1;
       // eslint-disable-next-line no-await-in-loop
       const resp = await callMessages({
         apiKey: agent.apiKey,
@@ -160,6 +204,10 @@ export async function handleAgentReply(
         tools,
         workspaceId: agent.anthropicWorkspaceId || undefined
       });
+
+      inputTokens += Number(resp.raw?.usage?.input_tokens || 0);
+      outputTokens += Number(resp.raw?.usage?.output_tokens || 0);
+      lastStopReason = resp.stopReason || lastStopReason;
 
       const toolUses = extractToolUses(resp.content);
 
@@ -175,9 +223,63 @@ export async function handleAgentReply(
         const toolResults: any[] = [];
         // eslint-disable-next-line no-restricted-syntax
         for (const tu of toolUses) {
+          const def = findToolDef(agent.tools, tu.name);
+
+          // GUARDRAIL determinístico ANTES de executar a ferramenta.
+          const decision = checkToolCall({
+            cfg: guardrails,
+            toolName: tu.name,
+            input: tu.input,
+            toolDef: def,
+            callsSoFar: toolCalls.filter(c => !c.blocked).length
+          });
+
+          if (!decision.allowed) {
+            if (decision.event) guardrailEvents.push(decision.event);
+            toolCalls.push({
+              name: tu.name,
+              status: "blocked",
+              blocked: true,
+              isError: true,
+              reason: decision.reason
+            });
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: tu.id,
+              content: `Ação bloqueada por política de segurança: ${decision.reason} Explique ao cliente de forma educada ou transfira para um humano.`,
+              is_error: true
+            });
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+
+          const startedAt = Date.now();
           // eslint-disable-next-line no-await-in-loop
           const result = await executeTool(tu.name, tu.input, agent.tools, ctx);
+          const ms = Date.now() - startedAt;
           if (result.transferred) transferred = true;
+
+          toolCalls.push({
+            name: tu.name,
+            status: result.transferred
+              ? "transfer"
+              : result.isError
+              ? "error"
+              : "ok",
+            ms,
+            isError: !!result.isError
+          });
+
+          // Auditoria (com máscara de PII quando ligada).
+          const auditInput = guardrails.maskPii
+            ? maskPiiInput(tu.input)
+            : tu.input;
+          logger.info(
+            `[Agente IA][auditoria] ticket=${ticketId} ferramenta=${tu.name} input=${JSON.stringify(
+              auditInput
+            ).slice(0, 500)} status=${result.isError ? "erro" : "ok"}`
+          );
+
           toolResults.push({
             type: "tool_result",
             tool_use_id: tu.id,
@@ -198,6 +300,7 @@ export async function handleAgentReply(
     // para o modelo concluir em texto — assim o cliente nunca fica sem resposta.
     if (!finalText) {
       try {
+        steps += 1;
         const closing = await callMessages({
           apiKey: agent.apiKey,
           model: agent.model,
@@ -207,6 +310,9 @@ export async function handleAgentReply(
           messages,
           workspaceId: agent.anthropicWorkspaceId || undefined
         });
+        inputTokens += Number(closing.raw?.usage?.input_tokens || 0);
+        outputTokens += Number(closing.raw?.usage?.output_tokens || 0);
+        lastStopReason = closing.stopReason || lastStopReason;
         finalText = extractText(closing.content);
       } catch (e) {
         describeAnthropicError(e);
@@ -223,10 +329,33 @@ export async function handleAgentReply(
         `[Agente IA] sem texto final para enviar (ticket=${ticketId}).`
       );
     }
+
+    traceStatus = transferred ? "transferred" : "ok";
   } catch (err: any) {
-    describeAnthropicError(err);
+    traceStatus = "error";
+    traceError = describeAnthropicError(err);
   } finally {
     runningTickets.delete(ticketId);
+
+    // Grava o trace do turno (raio-x) — best-effort.
+    if (shouldTrace) {
+      await recordTrace({
+        companyId,
+        ticketId,
+        agentId: traceAgentId,
+        model: traceModel,
+        inputTokens,
+        outputTokens,
+        latencyMs: Date.now() - turnStart,
+        steps,
+        toolCalls,
+        guardrailEvents,
+        stopReason: lastStopReason,
+        status: traceStatus,
+        finalText,
+        error: traceError
+      });
+    }
   }
 }
 

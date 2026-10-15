@@ -19,6 +19,7 @@ import WhatsappTemplates from "../pages/WhatsappTemplates/";
 import Integrations from "../pages/Integrations/";
 import WaUsage from "../pages/WaUsage/";
 import AIAgents from "../pages/AIAgents/";
+import AITraces from "../pages/AITraces/";
 import CtwaReport from "../pages/CtwaReport/";
 import Helps from "../pages/Helps/";
 import ContactLists from "../pages/ContactLists/";
@@ -116,6 +117,12 @@ const Routes = () => {
                   exact
                   path="/ai-agents"
                   component={AIAgents}
+                  isPrivate
+                />
+                <Route
+                  exact
+                  path="/ai-traces"
+                  component={AITraces}
                   isPrivate
                 />
                 <Route

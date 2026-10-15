@@ -6,6 +6,11 @@ import { logger } from "../../utils/logger";
 import { dispatchWebhookEvent } from "../WebhookServices/DispatchWebhook";
 import ShowTicketService from "../TicketServices/ShowTicketService";
 import { AnthropicTool } from "./AnthropicProvider";
+import {
+  saveMemory,
+  MEMORY_SCOPE_CONTACT,
+  MEMORY_SCOPE_SESSION
+} from "./AgentMemoryService";
 
 export const HUMAN_QUEUE_NAME = "Atendimento Humano";
 
@@ -87,6 +92,7 @@ export async function getOrCreateHumanQueue(
  */
 
 const TRANSFER_TOOL_NAME = "transferir_atendimento";
+export const MEMORY_TOOL_NAME = "anotar_memoria";
 
 /**
  * A Anthropic exige nome de ferramenta no padrão ^[a-zA-Z0-9_-]{1,128}$.
@@ -151,10 +157,40 @@ function transferToolDef(description?: string): AnthropicTool {
   };
 }
 
+/** Definição da ferramenta nativa de memória (estilo ADK). */
+function memoryToolDef(): AnthropicTool {
+  return {
+    name: MEMORY_TOOL_NAME,
+    description:
+      "Anota um fato importante na memória para lembrar depois e NÃO repetir perguntas. Use quando o cliente informar algo que vale guardar: nome, modelo/carro de interesse, forma de pagamento, melhor horário, se já é cliente, placa/veículo que possui, etc. Escolha o escopo: 'contato' para fatos duradouros do cliente (valem em conversas futuras) e 'conversa' para o estado deste atendimento. Anote de forma curta e objetiva (uma informação por chamada). Não anote dados sensíveis (senha, cartão, documentos).",
+    input_schema: {
+      type: "object",
+      properties: {
+        escopo: {
+          type: "string",
+          description:
+            "'contato' (fato duradouro do cliente) ou 'conversa' (estado deste atendimento). Padrão: conversa."
+        },
+        chave: {
+          type: "string",
+          description:
+            "Rótulo curto do fato, ex.: 'modelo_interesse', 'melhor_horario', 'forma_pagamento'."
+        },
+        valor: {
+          type: "string",
+          description: "O valor do fato, ex.: 'T-Cross Highline', 'sábado de manhã'."
+        }
+      },
+      required: ["chave", "valor"]
+    }
+  };
+}
+
 /**
  * Monta a lista de tools (formato Anthropic) para uma config de agente.
- * A ferramenta de transferência é SEMPRE incluída (mesmo que o admin não a
- * tenha adicionado), para o agente sempre conseguir passar para um humano.
+ * As ferramentas nativas de transferência e de memória são SEMPRE incluídas
+ * (mesmo que o admin não as tenha adicionado), para o agente sempre conseguir
+ * passar para um humano e registrar o que aprendeu.
  */
 export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
   const result: AnthropicTool[] = [];
@@ -164,6 +200,10 @@ export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
     if (t.kind === "transfer") {
       result.push(transferToolDef(t.description));
       hasTransfer = true;
+      return;
+    }
+    if (t.kind === "memory") {
+      // memória é nativa; ignoramos entradas duplicadas do admin
       return;
     }
     if (!t.name) return;
@@ -176,7 +216,16 @@ export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
   if (!hasTransfer) {
     result.push(transferToolDef());
   }
+  // memória nativa sempre disponível
+  result.push(memoryToolDef());
   return result;
+}
+
+/** Localiza a definição (config) de uma ferramenta pelo nome sanitizado. */
+export function findToolDef(agentTools: any[], toolName: string): any {
+  return (agentTools || []).find(
+    t => t?.name && sanitizeToolName(t.name) === toolName
+  );
 }
 
 /** Interpola {{chave}} e {{obj.campo}} usando input + contexto. */
@@ -205,6 +254,7 @@ function buildVars(input: any, ctx: AgentToolContext): Record<string, any> {
 export interface AgentToolContext {
   companyId: number;
   ticketId: number;
+  contactId?: number | null;
   contactName: string;
   contactNumber: string;
   transferQueueId?: number | null;
@@ -239,10 +289,13 @@ export async function executeTool(
     return executeTransfer(input, ctx);
   }
 
+  // Memória (nativa)
+  if (toolName === MEMORY_TOOL_NAME) {
+    return executeRememberMemory(input, ctx);
+  }
+
   // Casa pelo nome sanitizado (o modelo devolve o nome já sanitizado).
-  const def = (agentTools || []).find(
-    t => t?.name && sanitizeToolName(t.name) === toolName
-  );
+  const def = findToolDef(agentTools, toolName);
   if (!def) {
     return { content: `Ferramenta '${toolName}' não encontrada.`, isError: true };
   }
@@ -412,5 +465,43 @@ async function executeTransfer(
       "Atendimento transferido para um atendente humano. Você saiu desta conversa — dê uma despedida curta e educada e não responda mais.",
     isError: false,
     transferred: true
+  };
+}
+
+/**
+ * Grava um fato na memória do agente (nativo). Escopo "contato" => memória de
+ * longo prazo do cliente; "conversa" => estado desta conversa.
+ */
+async function executeRememberMemory(
+  input: any,
+  ctx: AgentToolContext
+): Promise<ToolExecutionResult> {
+  const chave = input?.chave ? String(input.chave).trim() : "";
+  const valor = input?.valor !== undefined ? String(input.valor) : "";
+  if (!chave) {
+    return { content: "Informe a chave do fato a memorizar.", isError: true };
+  }
+
+  const escopoRaw = (input?.escopo || "").toString().toLowerCase();
+  const scope =
+    escopoRaw.startsWith("cont") && !escopoRaw.startsWith("conv")
+      ? MEMORY_SCOPE_CONTACT
+      : MEMORY_SCOPE_SESSION;
+
+  const ok = await saveMemory({
+    companyId: ctx.companyId,
+    ticketId: ctx.ticketId,
+    contactId: ctx.contactId || null,
+    scope,
+    key: chave,
+    value: valor
+  });
+
+  const label = scope === MEMORY_SCOPE_CONTACT ? "cliente" : "conversa";
+  return {
+    content: ok
+      ? `Anotado na memória (${label}): ${chave} = ${valor}.`
+      : "Não foi possível anotar agora; siga o atendimento normalmente.",
+    isError: !ok
   };
 }

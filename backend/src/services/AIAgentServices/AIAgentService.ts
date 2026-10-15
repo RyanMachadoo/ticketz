@@ -20,6 +20,29 @@ export interface AIAgentData {
   isActive?: boolean;
   queueIds?: number[];
   transferQueueId?: number | null;
+  guardrails?: any;
+}
+
+/** Normaliza/saneia a config de guardrails recebida da UI. */
+function sanitizeGuardrails(raw: any): any {
+  const g = raw && typeof raw === "object" ? raw : {};
+  const toArr = (v: any): string[] =>
+    Array.isArray(v)
+      ? v.map(x => String(x || "").trim()).filter(Boolean)
+      : typeof v === "string"
+      ? v
+          .split(/[\n,;]+/)
+          .map(s => s.trim())
+          .filter(Boolean)
+      : [];
+  const n = Number(g.maxToolCallsPerTurn);
+  return {
+    maxToolCallsPerTurn: Number.isFinite(n) && n > 0 ? Math.floor(n) : 0,
+    allowedDomains: toArr(g.allowedDomains),
+    blockedDomains: toArr(g.blockedDomains),
+    blockedKeywords: toArr(g.blockedKeywords),
+    maskPii: !!g.maskPii
+  };
 }
 
 /** Serializa o agente para a UI: sem a chave, com hasApiKey e queueIds. */
@@ -128,7 +151,8 @@ export async function createAgent(
     transferQueueId:
       data.transferQueueId === undefined || data.transferQueueId === null
         ? null
-        : Number(data.transferQueueId)
+        : Number(data.transferQueueId),
+    guardrails: sanitizeGuardrails(data.guardrails)
   } as any);
 
   await syncQueues(agent, data.queueIds, companyId);
@@ -171,7 +195,11 @@ export async function updateAgent(
         ? agent.transferQueueId
         : data.transferQueueId === null || `${data.transferQueueId}` === ""
         ? null
-        : Number(data.transferQueueId)
+        : Number(data.transferQueueId),
+    guardrails:
+      data.guardrails === undefined
+        ? agent.guardrails
+        : sanitizeGuardrails(data.guardrails)
   };
 
   // Só troca a chave quando vier uma nova não vazia (mantém a atual caso contrário).

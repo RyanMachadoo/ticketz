@@ -313,6 +313,23 @@ const messages = {
           systemPrompt: "Instruções (system prompt)",
           systemPromptHint:
             "Defina o papel, o tom e as regras do agente. Ele já recebe o contexto do cliente.",
+          guardrailsTitle: "Guardrails (segurança determinística)",
+          guardrailsHint:
+            "Regras verificadas em código ANTES de cada ferramenta — previsíveis e independentes do que o modelo decide.",
+          maxToolCallsPerTurn: "Máx. chamadas de ferramenta por turno",
+          maxToolCallsPerTurnHint: "0 = sem limite. Evita loops e custo.",
+          maskPii: "Mascarar dados sensíveis (PII) na auditoria",
+          maskPiiHint:
+            "Oculta CPF, telefone, e-mail e cartão nos logs/trace. Não altera o que é enviado às ferramentas.",
+          allowedDomains: "Domínios permitidos (HTTP)",
+          allowedDomainsHint:
+            "Se preenchido, o agente só chama estes domínios. Separe por vírgula.",
+          blockedDomains: "Domínios bloqueados (HTTP)",
+          blockedDomainsHint:
+            "O agente nunca chama estes domínios. Separe por vírgula.",
+          blockedKeywords: "Palavras bloqueadas no input",
+          blockedKeywordsHint:
+            "Bloqueia a ferramenta se o conteúdo tiver estas palavras. Separe por vírgula.",
           toolsTitle: "Ferramentas",
           toolsHint:
             "Ferramentas que o agente pode acionar durante o atendimento. HTTP chama uma API, Webhook dispara uma automação (n8n), Transferir passa para um humano.",
@@ -347,6 +364,52 @@ const messages = {
           addParam: "Adicionar parâmetro",
           cancel: "Cancelar",
           save: "Salvar"
+        }
+      },
+      aiTraces: {
+        title: "Observabilidade do Agente (Raio-X)",
+        hint:
+          "Cada resposta do agente de IA gera um trace: tokens, custo estimado, latência, passos e a trajetória de ferramentas. Use para auditar, depurar e controlar o custo de IA por atendimento.",
+        refresh: "Atualizar",
+        empty: "Nenhum trace registrado ainda.",
+        filterTicket: "Filtrar por ticket",
+        applyFilter: "Filtrar",
+        cards: {
+          turns: "Turnos (30d)",
+          tokens: "Tokens (ent/saí)",
+          cost: "Custo estimado",
+          avgLatency: "Latência média",
+          transfers: "Transferências",
+          errors: "Erros",
+          model: "Modelo"
+        },
+        table: {
+          when: "Quando",
+          contact: "Contato",
+          agent: "Agente",
+          tokens: "Tokens (e/s)",
+          cost: "Custo",
+          latency: "Latência",
+          steps: "Passos",
+          tools: "Ferramentas",
+          status: "Status",
+          actions: "Ações"
+        },
+        status: {
+          ok: "OK",
+          error: "Erro",
+          transferred: "Transferido"
+        },
+        detail: {
+          title: "Raio-X do turno",
+          trajectory: "Trajetória de ferramentas",
+          tool: "Ferramenta",
+          reason: "Observação",
+          noTools: "Nenhuma ferramenta usada neste turno.",
+          guardrails: "Guardrails acionados",
+          finalText: "Resposta enviada",
+          error: "Erro",
+          close: "Fechar"
         }
       },
       waUsage: {
@@ -782,6 +845,7 @@ const messages = {
           integrations: "Integrações",
           waUsage: "Custos / Uso",
           aiAgents: "Agentes de IA",
+          aiTraces: "Observabilidade IA",
           ctwaReport: "Leads (Click-to-WhatsApp)",
           schedules: "Agendamentos",
           campaigns: "Campanhas",

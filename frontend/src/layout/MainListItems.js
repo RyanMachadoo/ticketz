@@ -35,6 +35,7 @@ import ForumIcon from "@material-ui/icons/Forum";
 import LocalAtmIcon from "@material-ui/icons/LocalAtm";
 import MonetizationOnIcon from "@material-ui/icons/MonetizationOn";
 import SmartToyIcon from "@material-ui/icons/Android";
+import InsightsIcon from "@material-ui/icons/Timeline";
 import AdsClickIcon from "@material-ui/icons/TrendingUp";
 import RotateRight from "@material-ui/icons/RotateRight";
 import { i18n } from "../translate/i18n";
@@ -474,6 +475,11 @@ const MainListItems = props => {
               to="/ai-agents"
               primary={i18n.t("mainDrawer.listItems.aiAgents")}
               icon={<SmartToyIcon />}
+            />
+            <ListItemLink
+              to="/ai-traces"
+              primary={i18n.t("mainDrawer.listItems.aiTraces")}
+              icon={<InsightsIcon />}
             />
             <ListItemLink
               to="/ctwa-report"

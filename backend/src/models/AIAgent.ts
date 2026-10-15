@@ -95,6 +95,13 @@ class AIAgent extends Model<AIAgent> {
   @Column
   transferQueueId: number;
 
+  // Guardrails determinísticos (verificações em código antes das ferramentas).
+  // Ver AgentGuardrails.ts. Ex.: { maxToolCallsPerTurn, allowedDomains,
+  // blockedDomains, blockedKeywords, maskPii }.
+  @Default({})
+  @Column(DataType.JSONB)
+  guardrails: any;
+
   @HasMany(() => Queue)
   queues: Queue[];
 

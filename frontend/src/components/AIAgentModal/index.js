@@ -94,7 +94,14 @@ const defaultForm = {
   systemPrompt: "",
   tools: [],
   queueIds: [],
-  transferQueueId: ""
+  transferQueueId: "",
+  guardrails: {
+    maxToolCallsPerTurn: "",
+    allowedDomains: "",
+    blockedDomains: "",
+    blockedKeywords: "",
+    maskPii: false
+  }
 };
 
 const AIAgentModal = ({ open, onClose, agentId }) => {
@@ -137,7 +144,27 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             transferQueueId:
               data.transferQueueId === null || data.transferQueueId === undefined
                 ? ""
-                : data.transferQueueId
+                : data.transferQueueId,
+            guardrails: {
+              maxToolCallsPerTurn:
+                data.guardrails && data.guardrails.maxToolCallsPerTurn
+                  ? data.guardrails.maxToolCallsPerTurn
+                  : "",
+              allowedDomains:
+                data.guardrails && Array.isArray(data.guardrails.allowedDomains)
+                  ? data.guardrails.allowedDomains.join(", ")
+                  : "",
+              blockedDomains:
+                data.guardrails && Array.isArray(data.guardrails.blockedDomains)
+                  ? data.guardrails.blockedDomains.join(", ")
+                  : "",
+              blockedKeywords:
+                data.guardrails &&
+                Array.isArray(data.guardrails.blockedKeywords)
+                  ? data.guardrails.blockedKeywords.join(", ")
+                  : "",
+              maskPii: !!(data.guardrails && data.guardrails.maskPii)
+            }
           });
         } catch (err) {
           toastError(err);
@@ -147,6 +174,9 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
   }, [open, agentId]);
 
   const setField = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  const setGuardrail = (field, value) =>
+    setForm(f => ({ ...f, guardrails: { ...f.guardrails, [field]: value } }));
 
   // ---- tools helpers ----
   const addTool = kind =>
@@ -218,7 +248,14 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
           form.transferQueueId === "" ? null : Number(form.transferQueueId),
         anthropicWorkspaceId: form.anthropicWorkspaceId
           ? form.anthropicWorkspaceId.trim()
-          : null
+          : null,
+        guardrails: {
+          maxToolCallsPerTurn: Number(form.guardrails.maxToolCallsPerTurn) || 0,
+          allowedDomains: form.guardrails.allowedDomains,
+          blockedDomains: form.guardrails.blockedDomains,
+          blockedKeywords: form.guardrails.blockedKeywords,
+          maskPii: !!form.guardrails.maskPii
+        }
       };
       // Só envia a chave se o usuário digitou uma nova.
       if (form.apiKey && form.apiKey.trim()) {
@@ -586,6 +623,82 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
               margin="dense"
               multiline
               minRows={5}
+            />
+          </Grid>
+        </Grid>
+
+        <Divider className={classes.section} />
+        <Typography variant="subtitle1">
+          {i18n.t("aiAgents.modal.guardrailsTitle")}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          className={classes.hint}
+        >
+          {i18n.t("aiAgents.modal.guardrailsHint")}
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label={i18n.t("aiAgents.modal.maxToolCallsPerTurn")}
+              helperText={i18n.t("aiAgents.modal.maxToolCallsPerTurnHint")}
+              type="number"
+              inputProps={{ min: 0 }}
+              value={form.guardrails.maxToolCallsPerTurn}
+              onChange={e =>
+                setGuardrail("maxToolCallsPerTurn", e.target.value)
+              }
+              fullWidth
+              margin="dense"
+            />
+          </Grid>
+          <Grid item xs={12} sm={8}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!form.guardrails.maskPii}
+                  onChange={e => setGuardrail("maskPii", e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={i18n.t("aiAgents.modal.maskPii")}
+            />
+            <Typography variant="caption" color="textSecondary" display="block">
+              {i18n.t("aiAgents.modal.maskPiiHint")}
+            </Typography>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label={i18n.t("aiAgents.modal.allowedDomains")}
+              helperText={i18n.t("aiAgents.modal.allowedDomainsHint")}
+              value={form.guardrails.allowedDomains}
+              onChange={e => setGuardrail("allowedDomains", e.target.value)}
+              fullWidth
+              margin="dense"
+              placeholder="api.meusistema.com, erp.francauto.com.br"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label={i18n.t("aiAgents.modal.blockedDomains")}
+              helperText={i18n.t("aiAgents.modal.blockedDomainsHint")}
+              value={form.guardrails.blockedDomains}
+              onChange={e => setGuardrail("blockedDomains", e.target.value)}
+              fullWidth
+              margin="dense"
+              placeholder="localhost, 169.254.169.254"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label={i18n.t("aiAgents.modal.blockedKeywords")}
+              helperText={i18n.t("aiAgents.modal.blockedKeywordsHint")}
+              value={form.guardrails.blockedKeywords}
+              onChange={e => setGuardrail("blockedKeywords", e.target.value)}
+              fullWidth
+              margin="dense"
+              placeholder="senha, cartão, cpf"
             />
           </Grid>
         </Grid>

@@ -45,6 +45,8 @@ import Webhook from "../models/Webhook";
 import MessageUsage from "../models/MessageUsage";
 import AIAgent from "../models/AIAgent";
 import CtwaReferral from "../models/CtwaReferral";
+import AgentMemory from "../models/AgentMemory";
+import AgentTrace from "../models/AgentTrace";
 
 const dbConfig = require("../config/database");
 
@@ -102,7 +104,9 @@ const models = [
   Webhook,
   MessageUsage,
   AIAgent,
-  CtwaReferral
+  CtwaReferral,
+  AgentMemory,
+  AgentTrace
 ];
 
 sequelize.addModels(models);

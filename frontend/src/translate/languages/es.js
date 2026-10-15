@@ -312,6 +312,23 @@ const messages = {
           systemPrompt: "Instrucciones (system prompt)",
           systemPromptHint:
             "Defina el rol, el tono y las reglas del agente. Ya recibe el contexto del cliente.",
+          guardrailsTitle: "Guardrails (seguridad determinística)",
+          guardrailsHint:
+            "Reglas verificadas en código ANTES de cada herramienta — previsibles e independientes de lo que decide el modelo.",
+          maxToolCallsPerTurn: "Máx. llamadas de herramienta por turno",
+          maxToolCallsPerTurnHint: "0 = sin límite. Evita bucles y costo.",
+          maskPii: "Enmascarar datos sensibles (PII) en la auditoría",
+          maskPiiHint:
+            "Oculta documentos, teléfonos, e-mails y tarjetas en logs/trace. No cambia lo que se envía a las herramientas.",
+          allowedDomains: "Dominios permitidos (HTTP)",
+          allowedDomainsHint:
+            "Si se completa, el agente solo llama estos dominios. Separe por comas.",
+          blockedDomains: "Dominios bloqueados (HTTP)",
+          blockedDomainsHint:
+            "El agente nunca llama estos dominios. Separe por comas.",
+          blockedKeywords: "Palabras bloqueadas en el input",
+          blockedKeywordsHint:
+            "Bloquea la herramienta si el contenido tiene estas palabras. Separe por comas.",
           toolsTitle: "Herramientas",
           toolsHint:
             "Herramientas que el agente puede accionar. HTTP llama una API, Webhook dispara una automatización (n8n), Transferir pasa a un humano.",
@@ -346,6 +363,52 @@ const messages = {
           addParam: "Agregar parámetro",
           cancel: "Cancelar",
           save: "Guardar"
+        }
+      },
+      aiTraces: {
+        title: "Observabilidad del Agente (Radiografía)",
+        hint:
+          "Cada respuesta del agente de IA genera un trace: tokens, costo estimado, latencia, pasos y la trayectoria de herramientas. Úselo para auditar, depurar y controlar el costo de IA por atención.",
+        refresh: "Actualizar",
+        empty: "Aún no hay traces registrados.",
+        filterTicket: "Filtrar por ticket",
+        applyFilter: "Filtrar",
+        cards: {
+          turns: "Turnos (30d)",
+          tokens: "Tokens (ent/sal)",
+          cost: "Costo estimado",
+          avgLatency: "Latencia media",
+          transfers: "Transferencias",
+          errors: "Errores",
+          model: "Modelo"
+        },
+        table: {
+          when: "Cuándo",
+          contact: "Contacto",
+          agent: "Agente",
+          tokens: "Tokens (e/s)",
+          cost: "Costo",
+          latency: "Latencia",
+          steps: "Pasos",
+          tools: "Herramientas",
+          status: "Estado",
+          actions: "Acciones"
+        },
+        status: {
+          ok: "OK",
+          error: "Error",
+          transferred: "Transferido"
+        },
+        detail: {
+          title: "Radiografía del turno",
+          trajectory: "Trayectoria de herramientas",
+          tool: "Herramienta",
+          reason: "Observación",
+          noTools: "Ninguna herramienta usada en este turno.",
+          guardrails: "Guardrails accionados",
+          finalText: "Respuesta enviada",
+          error: "Error",
+          close: "Cerrar"
         }
       },
       waUsage: {
@@ -785,6 +848,7 @@ const messages = {
           integrations: "Integraciones",
           waUsage: "Costos / Uso",
           aiAgents: "Agentes de IA",
+          aiTraces: "Observabilidad IA",
           ctwaReport: "Leads (Click-to-WhatsApp)",
           schedules: "Agendamientos",
           campaigns: "Campañas",

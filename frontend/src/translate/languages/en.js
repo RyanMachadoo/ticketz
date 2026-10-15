@@ -314,6 +314,23 @@ const messages = {
           systemPrompt: "Instructions (system prompt)",
           systemPromptHint:
             "Define the agent's role, tone and rules. It already receives the customer context.",
+          guardrailsTitle: "Guardrails (deterministic safety)",
+          guardrailsHint:
+            "Rules checked in code BEFORE each tool — predictable and independent of what the model decides.",
+          maxToolCallsPerTurn: "Max tool calls per turn",
+          maxToolCallsPerTurnHint: "0 = no limit. Prevents loops and cost.",
+          maskPii: "Mask sensitive data (PII) in audit",
+          maskPiiHint:
+            "Hides tax IDs, phones, e-mails and cards in logs/trace. Does not change what is sent to tools.",
+          allowedDomains: "Allowed domains (HTTP)",
+          allowedDomainsHint:
+            "If set, the agent only calls these domains. Comma-separated.",
+          blockedDomains: "Blocked domains (HTTP)",
+          blockedDomainsHint:
+            "The agent never calls these domains. Comma-separated.",
+          blockedKeywords: "Blocked keywords in input",
+          blockedKeywordsHint:
+            "Blocks the tool if the content contains these words. Comma-separated.",
           toolsTitle: "Tools",
           toolsHint:
             "Tools the agent can trigger. HTTP calls an API, Webhook fires an automation (n8n), Transfer hands off to a human.",
@@ -346,6 +363,52 @@ const messages = {
           addParam: "Add parameter",
           cancel: "Cancel",
           save: "Save"
+        }
+      },
+      aiTraces: {
+        title: "Agent Observability (X-Ray)",
+        hint:
+          "Each AI agent reply produces a trace: tokens, estimated cost, latency, steps and the tool trajectory. Use it to audit, debug and control AI cost per conversation.",
+        refresh: "Refresh",
+        empty: "No traces recorded yet.",
+        filterTicket: "Filter by ticket",
+        applyFilter: "Filter",
+        cards: {
+          turns: "Turns (30d)",
+          tokens: "Tokens (in/out)",
+          cost: "Estimated cost",
+          avgLatency: "Avg latency",
+          transfers: "Transfers",
+          errors: "Errors",
+          model: "Model"
+        },
+        table: {
+          when: "When",
+          contact: "Contact",
+          agent: "Agent",
+          tokens: "Tokens (i/o)",
+          cost: "Cost",
+          latency: "Latency",
+          steps: "Steps",
+          tools: "Tools",
+          status: "Status",
+          actions: "Actions"
+        },
+        status: {
+          ok: "OK",
+          error: "Error",
+          transferred: "Transferred"
+        },
+        detail: {
+          title: "Turn X-Ray",
+          trajectory: "Tool trajectory",
+          tool: "Tool",
+          reason: "Note",
+          noTools: "No tools used in this turn.",
+          guardrails: "Guardrails triggered",
+          finalText: "Reply sent",
+          error: "Error",
+          close: "Close"
         }
       },
       waUsage: {
@@ -782,6 +845,7 @@ const messages = {
           integrations: "Integrations",
           waUsage: "Costs / Usage",
           aiAgents: "AI Agents",
+          aiTraces: "AI Observability",
           ctwaReport: "Leads (Click-to-WhatsApp)",
           schedules: "Schedules",
           campaigns: "Campaigns",
