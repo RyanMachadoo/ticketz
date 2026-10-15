@@ -61,6 +61,14 @@ const newTool = kind => {
   if (kind === "transfer") {
     return { kind: "transfer", description: "" };
   }
+  if (kind === "estoque") {
+    return {
+      kind: "estoque",
+      description: "",
+      baseUrl: "",
+      path: "/seminovos"
+    };
+  }
   if (kind === "webhook") {
     return {
       kind: "webhook",
@@ -354,7 +362,7 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         </IconButton>
       </div>
 
-      {tool.kind !== "transfer" && (
+      {tool.kind !== "transfer" && tool.kind !== "estoque" && (
         <TextField
           label={i18n.t("aiAgents.modal.toolName")}
           helperText={i18n.t("aiAgents.modal.toolNameHint")}
@@ -383,6 +391,33 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
           fullWidth
           margin="dense"
         />
+      )}
+
+      {tool.kind === "estoque" && (
+        <Grid container spacing={1}>
+          <Grid item xs={12} sm={7}>
+            <TextField
+              label={i18n.t("aiAgents.modal.estoqueBaseUrl")}
+              helperText={i18n.t("aiAgents.modal.estoqueBaseUrlHint")}
+              value={tool.baseUrl || ""}
+              onChange={e => updateTool(idx, { baseUrl: e.target.value })}
+              fullWidth
+              margin="dense"
+              placeholder="https://www.francauto.com.br"
+            />
+          </Grid>
+          <Grid item xs={12} sm={5}>
+            <TextField
+              label={i18n.t("aiAgents.modal.estoquePath")}
+              helperText={i18n.t("aiAgents.modal.estoquePathHint")}
+              value={tool.path || ""}
+              onChange={e => updateTool(idx, { path: e.target.value })}
+              fullWidth
+              margin="dense"
+              placeholder="/seminovos"
+            />
+          </Grid>
+        </Grid>
       )}
 
       {tool.kind === "http" && (
@@ -461,7 +496,9 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         </>
       )}
 
-      {tool.kind !== "transfer" && renderParams(tool, idx)}
+      {tool.kind !== "transfer" &&
+        tool.kind !== "estoque" &&
+        renderParams(tool, idx)}
     </Paper>
   );
 
@@ -741,6 +778,14 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             onClick={() => addTool("transfer")}
           >
             {i18n.t("aiAgents.modal.addTransfer")}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddCircleOutline />}
+            onClick={() => addTool("estoque")}
+          >
+            {i18n.t("aiAgents.modal.addEstoque")}
           </Button>
         </div>
       </DialogContent>

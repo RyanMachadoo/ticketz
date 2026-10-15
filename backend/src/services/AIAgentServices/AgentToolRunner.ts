@@ -11,6 +11,11 @@ import {
   MEMORY_SCOPE_CONTACT,
   MEMORY_SCOPE_SESSION
 } from "./AgentMemoryService";
+import {
+  consultarEstoque,
+  EstoqueFiltro,
+  EstoqueVeiculo
+} from "../EstoqueServices/EstoqueService";
 
 export const HUMAN_QUEUE_NAME = "Atendimento Humano";
 
@@ -93,6 +98,7 @@ export async function getOrCreateHumanQueue(
 
 const TRANSFER_TOOL_NAME = "transferir_atendimento";
 export const MEMORY_TOOL_NAME = "anotar_memoria";
+export const ESTOQUE_TOOL_NAME = "consultar_estoque";
 
 /**
  * A Anthropic exige nome de ferramenta no padrão ^[a-zA-Z0-9_-]{1,128}$.
@@ -186,20 +192,76 @@ function memoryToolDef(): AnthropicTool {
   };
 }
 
+/** Definição da ferramenta nativa de consulta de estoque (formato Anthropic). */
+function estoqueToolDef(description?: string): AnthropicTool {
+  return {
+    name: ESTOQUE_TOOL_NAME,
+    description:
+      description ||
+      "Consulta o estoque de veículos da concessionária (0km e usados) em tempo real. Use SEMPRE que o cliente perguntar se tem um modelo, pedir opções, faixa de preço, ou quiser ver carros disponíveis — nunca invente modelos, anos, km ou preços: consulte aqui. Você pode filtrar por tipo (novos/usados), modelo, preço máximo, ano mínimo, câmbio e combustível. Depois de mostrar as opções, puxe o cliente para agendar uma visita/test drive e transfira para um vendedor.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: {
+          type: "string",
+          description:
+            "'novos' (0km), 'usados' (seminovos) ou 'todos'. Padrão: todos."
+        },
+        modelo: {
+          type: "string",
+          description:
+            "Filtra por modelo/termo (ex.: 'T-Cross', 'Amarok', 'Nivus'). Opcional."
+        },
+        preco_max: {
+          type: "number",
+          description: "Preço máximo em reais (ex.: 120000). Opcional."
+        },
+        preco_min: {
+          type: "number",
+          description: "Preço mínimo em reais. Opcional."
+        },
+        ano_min: {
+          type: "number",
+          description: "Ano mínimo do veículo (ex.: 2022). Opcional."
+        },
+        cambio: {
+          type: "string",
+          description: "Filtra por câmbio (ex.: 'automático', 'manual'). Opcional."
+        },
+        combustivel: {
+          type: "string",
+          description:
+            "Filtra por combustível (ex.: 'flex', 'diesel', 'gasolina'). Opcional."
+        }
+      },
+      required: []
+    }
+  };
+}
+
 /**
  * Monta a lista de tools (formato Anthropic) para uma config de agente.
  * As ferramentas nativas de transferência e de memória são SEMPRE incluídas
  * (mesmo que o admin não as tenha adicionado), para o agente sempre conseguir
- * passar para um humano e registrar o que aprendeu.
+ * passar para um humano e registrar o que aprendeu. A de estoque só entra
+ * quando o admin adiciona uma ferramenta do tipo "estoque" (opt-in).
  */
 export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
   const result: AnthropicTool[] = [];
   let hasTransfer = false;
+  let hasEstoque = false;
   (tools || []).forEach(t => {
     if (!t) return;
     if (t.kind === "transfer") {
       result.push(transferToolDef(t.description));
       hasTransfer = true;
+      return;
+    }
+    if (t.kind === "estoque") {
+      if (!hasEstoque) {
+        result.push(estoqueToolDef(t.description));
+        hasEstoque = true;
+      }
       return;
     }
     if (t.kind === "memory") {
@@ -292,6 +354,12 @@ export async function executeTool(
   // Memória (nativa)
   if (toolName === MEMORY_TOOL_NAME) {
     return executeRememberMemory(input, ctx);
+  }
+
+  // Estoque (nativa, opt-in): usa a config da ferramenta kind "estoque".
+  if (toolName === ESTOQUE_TOOL_NAME) {
+    const estoqueDef = (agentTools || []).find(t => t?.kind === "estoque");
+    return executeEstoque(estoqueDef, input);
   }
 
   // Casa pelo nome sanitizado (o modelo devolve o nome já sanitizado).
@@ -504,4 +572,81 @@ async function executeRememberMemory(
       : "Não foi possível anotar agora; siga o atendimento normalmente.",
     isError: !ok
   };
+}
+
+const formatBRL = (n: number): string =>
+  `R$ ${Number(n || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  })}`;
+
+const linhaVeiculo = (v: EstoqueVeiculo): string => {
+  const partes = [v.nome || `${v.marca} ${v.modelo}`.trim()];
+  const extra: string[] = [];
+  if (v.tipo === "usado" && v.km) extra.push(`${v.km.toLocaleString("pt-BR")} km`);
+  if (v.tipo === "novo") extra.push("0km");
+  const meta = extra.length ? ` (${extra.join(", ")})` : "";
+  return `- ${partes[0]}${meta} — ${formatBRL(v.preco)}`;
+};
+
+/**
+ * Consulta o estoque (0km/usados) e devolve um resumo compacto em texto para o
+ * modelo — contagens, faixa de preço e uma lista enxuta dos veículos.
+ */
+async function executeEstoque(
+  def: any,
+  input: any
+): Promise<ToolExecutionResult> {
+  const filtro: EstoqueFiltro = {
+    tipo: input?.tipo,
+    modelo: input?.modelo,
+    precoMax: input?.preco_max,
+    precoMin: input?.preco_min,
+    anoMin: input?.ano_min,
+    cambio: input?.cambio,
+    combustivel: input?.combustivel
+  };
+
+  try {
+    const res = await consultarEstoque(
+      {
+        baseUrl: def?.baseUrl,
+        path: def?.path,
+        limit: Number(def?.limit) || 20
+      },
+      filtro
+    );
+
+    if (!res.total) {
+      return {
+        content:
+          "Nenhum veículo encontrado com esses critérios no estoque agora. Ofereça ajustar o filtro (modelo/preço) ou transfira para um vendedor consultar novidades.",
+        isError: false
+      };
+    }
+
+    const cab = `Estoque encontrado: ${res.total} veículo(s)` +
+      (res.novos ? `, ${res.novos} zero-km` : "") +
+      (res.usados ? `, ${res.usados} usado(s)` : "") +
+      (res.precoMin != null
+        ? `. Preços de ${formatBRL(res.precoMin)} a ${formatBRL(res.precoMax || 0)}.`
+        : ".");
+
+    const linhas = res.itens.map(linhaVeiculo).join("\n");
+    const rodape = res.truncado
+      ? `\n(mostrando ${res.itens.length} de ${res.total}; peça para filtrar por modelo ou faixa de preço para refinar.)`
+      : "";
+
+    return {
+      content: `${cab}\n${linhas}${rodape}`,
+      isError: false
+    };
+  } catch (err: any) {
+    logger.error(`[Agente IA] erro ao consultar estoque: ${err?.message}`);
+    return {
+      content:
+        "Não consegui consultar o estoque agora. Peça desculpas rapidamente e ofereça transferir para um vendedor.",
+      isError: true
+    };
+  }
 }

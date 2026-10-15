@@ -40,6 +40,7 @@ import webhookRoutes from "./webhookRoutes";
 import waUsageRoutes from "./waUsageRoutes";
 import aiAgentRoutes from "./aiAgentRoutes";
 import aiTraceRoutes from "./aiTraceRoutes";
+import estoqueRoutes from "./estoqueRoutes";
 import ctwaRoutes from "./ctwaRoutes";
 
 const routes = Router();
@@ -53,6 +54,7 @@ routes.use(webhookRoutes);
 routes.use(waUsageRoutes);
 routes.use(aiAgentRoutes);
 routes.use(aiTraceRoutes);
+routes.use(estoqueRoutes);
 routes.use(ctwaRoutes);
 routes.use(contactRoutes);
 routes.use(ticketRoutes);

@@ -335,11 +335,19 @@ const messages = {
           addHttp: "API HTTP",
           addWebhook: "Webhook",
           addTransfer: "Transferir a humano",
+          addEstoque: "Consultar inventario",
           kind: {
             http: "API HTTP",
             webhook: "Webhook",
-            transfer: "Transferir a humano"
+            transfer: "Transferir a humano",
+            estoque: "Consultar inventario"
           },
+          estoqueBaseUrl: "URL del sitio (inventario)",
+          estoqueBaseUrlHint:
+            "Dirección del sitio de la concesionaria (ej.: https://www.francauto.com.br). El agente lee el inventario de allí.",
+          estoquePath: "Ruta del listado",
+          estoquePathHint:
+            "Página de listado del inventario (ej.: /seminovos). Incluye 0km y usados; el sistema separa por kilometraje.",
           toolName: "Nombre de la herramienta",
           toolNameHint:
             "Identificador corto, sin espacios (ej.: consulta_os). El modelo usa este nombre.",
