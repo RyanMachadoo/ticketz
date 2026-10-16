@@ -21,6 +21,8 @@ export interface AIAgentData {
   queueIds?: number[];
   transferQueueId?: number | null;
   guardrails?: any;
+  inactivityTimeoutMinutes?: number;
+  conversationResetDays?: number;
 }
 
 /** Normaliza/saneia a config de guardrails recebida da UI. */
@@ -152,7 +154,15 @@ export async function createAgent(
       data.transferQueueId === undefined || data.transferQueueId === null
         ? null
         : Number(data.transferQueueId),
-    guardrails: sanitizeGuardrails(data.guardrails)
+    guardrails: sanitizeGuardrails(data.guardrails),
+    inactivityTimeoutMinutes:
+      data.inactivityTimeoutMinutes !== undefined
+        ? Math.max(0, Math.floor(Number(data.inactivityTimeoutMinutes) || 0))
+        : 0,
+    conversationResetDays:
+      data.conversationResetDays !== undefined
+        ? Math.max(0, Math.floor(Number(data.conversationResetDays) || 0))
+        : 3
   } as any);
 
   await syncQueues(agent, data.queueIds, companyId);
@@ -199,7 +209,15 @@ export async function updateAgent(
     guardrails:
       data.guardrails === undefined
         ? agent.guardrails
-        : sanitizeGuardrails(data.guardrails)
+        : sanitizeGuardrails(data.guardrails),
+    inactivityTimeoutMinutes:
+      data.inactivityTimeoutMinutes === undefined
+        ? agent.inactivityTimeoutMinutes
+        : Math.max(0, Math.floor(Number(data.inactivityTimeoutMinutes) || 0)),
+    conversationResetDays:
+      data.conversationResetDays === undefined
+        ? agent.conversationResetDays
+        : Math.max(0, Math.floor(Number(data.conversationResetDays) || 0))
   };
 
   // Só troca a chave quando vier uma nova não vazia (mantém a atual caso contrário).

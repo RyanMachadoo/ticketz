@@ -302,6 +302,12 @@ const messages = {
           maxTokens: "Máx. tokens",
           temperature: "Temperatura",
           maxToolSteps: "Máx. passos de ferramenta",
+          inactivityTimeout: "Inatividade → humano (min)",
+          inactivityTimeoutHint:
+            "Minutos sem resposta do cliente para repassar o lead a um vendedor. 0 = desligado.",
+          conversationResetDays: "Recomeçar assunto após (dias)",
+          conversationResetDaysHint:
+            "Se o cliente voltar depois deste intervalo, o agente recomeça o assunto do zero (preferências vêm da memória). 0 = nunca.",
           active: "Ativo",
           queues: "Filas atendidas",
           queuesHint:

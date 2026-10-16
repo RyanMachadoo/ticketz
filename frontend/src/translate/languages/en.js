@@ -303,6 +303,12 @@ const messages = {
           maxTokens: "Max tokens",
           temperature: "Temperature",
           maxToolSteps: "Max tool steps",
+          inactivityTimeout: "Inactivity → human (min)",
+          inactivityTimeoutHint:
+            "Minutes without a customer reply before handing the lead to a salesperson. 0 = off.",
+          conversationResetDays: "Restart topic after (days)",
+          conversationResetDaysHint:
+            "If the customer returns after this gap, the agent restarts the topic fresh (preferences come from memory). 0 = never.",
           active: "Active",
           queues: "Served queues",
           queuesHint:

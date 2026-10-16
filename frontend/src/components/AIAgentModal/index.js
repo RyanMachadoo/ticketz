@@ -98,6 +98,8 @@ const defaultForm = {
   maxTokens: 1024,
   temperature: 0.7,
   maxToolSteps: 5,
+  inactivityTimeoutMinutes: 30,
+  conversationResetDays: 3,
   isActive: true,
   systemPrompt: "",
   tools: [],
@@ -145,6 +147,16 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             temperature:
               data.temperature !== undefined ? Number(data.temperature) : 0.7,
             maxToolSteps: data.maxToolSteps || 5,
+            inactivityTimeoutMinutes:
+              data.inactivityTimeoutMinutes === undefined ||
+              data.inactivityTimeoutMinutes === null
+                ? 0
+                : Number(data.inactivityTimeoutMinutes),
+            conversationResetDays:
+              data.conversationResetDays === undefined ||
+              data.conversationResetDays === null
+                ? 3
+                : Number(data.conversationResetDays),
             isActive: data.isActive !== undefined ? data.isActive : true,
             systemPrompt: data.systemPrompt || "",
             tools: Array.isArray(data.tools) ? data.tools : [],
@@ -248,6 +260,8 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         maxTokens: Number(form.maxTokens) || 1024,
         temperature: Number(form.temperature),
         maxToolSteps: Number(form.maxToolSteps) || 5,
+        inactivityTimeoutMinutes: Number(form.inactivityTimeoutMinutes) || 0,
+        conversationResetDays: Number(form.conversationResetDays) || 0,
         isActive: form.isActive,
         systemPrompt: form.systemPrompt,
         tools: form.tools,
@@ -584,6 +598,32 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
               type="number"
               value={form.maxToolSteps}
               onChange={e => setField("maxToolSteps", e.target.value)}
+              fullWidth
+              margin="dense"
+            />
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <TextField
+              label={i18n.t("aiAgents.modal.inactivityTimeout")}
+              helperText={i18n.t("aiAgents.modal.inactivityTimeoutHint")}
+              type="number"
+              inputProps={{ min: 0 }}
+              value={form.inactivityTimeoutMinutes}
+              onChange={e =>
+                setField("inactivityTimeoutMinutes", e.target.value)
+              }
+              fullWidth
+              margin="dense"
+            />
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <TextField
+              label={i18n.t("aiAgents.modal.conversationResetDays")}
+              helperText={i18n.t("aiAgents.modal.conversationResetDaysHint")}
+              type="number"
+              inputProps={{ min: 0 }}
+              value={form.conversationResetDays}
+              onChange={e => setField("conversationResetDays", e.target.value)}
               fullWidth
               margin="dense"
             />

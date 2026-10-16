@@ -29,6 +29,10 @@ import {
   maskPiiInput
 } from "./AgentGuardrails";
 import { recordTrace, TraceToolCall } from "./AgentTraceService";
+import {
+  scheduleInactivityCheck,
+  cancelInactivityCheck
+} from "../../queues/AgentInactivityQueue";
 
 /**
  * Orquestra uma resposta do agente de IA para um ticket (estilo ADK):
@@ -45,16 +49,48 @@ import { recordTrace, TraceToolCall } from "./AgentTraceService";
  */
 
 const HISTORY_LIMIT = 40;
+const AGENT_TIMEZONE = process.env.AGENT_TIMEZONE || "America/Sao_Paulo";
 
 // Trava simples em memória para não rodar o agente duas vezes no mesmo ticket
 // ao mesmo tempo (ex.: cliente manda várias mensagens seguidas).
 const runningTickets = new Set<number>();
 
-/** Mapeia e normaliza o histórico para o formato da Anthropic (alterna papéis). */
+/** Data/hora atual, por extenso, no fuso configurado (horário de Brasília). */
+function nowInTimezone(): string {
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: AGENT_TIMEZONE,
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
+interface ConversationBuild {
+  messages: AnthropicMessage[];
+  resetApplied: boolean; // histórico foi cortado por intervalo longo
+  gapDays: number; // dias desde o último contato (quando houve corte)
+}
+
+/**
+ * Monta e normaliza o histórico para o formato da Anthropic (alterna papéis).
+ *
+ * "Corte de continuidade": se o cliente volta após um intervalo grande
+ * (resetDays, ex.: 3 dias), o histórico é cortado no ponto de retomada para o
+ * agente recomeçar o assunto do zero. As PREFERÊNCIAS não se perdem — elas vêm
+ * da memória de longo prazo (por contato), não do histórico cru.
+ */
 async function buildConversation(
   ticketId: number,
-  companyId: number
-): Promise<AnthropicMessage[]> {
+  companyId: number,
+  resetDays: number
+): Promise<ConversationBuild> {
   const messages = await Message.findAll({
     where: { ticketId, companyId },
     order: [
@@ -64,8 +100,28 @@ async function buildConversation(
     limit: HISTORY_LIMIT
   });
 
+  // Detecta o corte: o intervalo longo MAIS RECENTE entre mensagens consecutivas.
+  let startIdx = 0;
+  let resetApplied = false;
+  let gapDays = 0;
+  if (resetDays && resetDays > 0 && messages.length > 1) {
+    const thresholdMs = resetDays * 24 * 60 * 60 * 1000;
+    for (let i = messages.length - 1; i > 0; i -= 1) {
+      const gap =
+        new Date(messages[i].createdAt).getTime() -
+        new Date(messages[i - 1].createdAt).getTime();
+      if (gap >= thresholdMs) {
+        startIdx = i;
+        resetApplied = true;
+        gapDays = Math.round(gap / 86400000);
+        break;
+      }
+    }
+  }
+
+  const slice = messages.slice(startIdx);
   const turns: { role: "user" | "assistant"; text: string }[] = [];
-  messages.forEach(m => {
+  slice.forEach(m => {
     let text = (m.body || "").trim();
     if (!text && m.mediaType && m.mediaType !== "chat") {
       text = `[cliente enviou uma mídia do tipo ${m.mediaType}]`;
@@ -85,7 +141,11 @@ async function buildConversation(
     turns.shift();
   }
 
-  return turns.map(t => ({ role: t.role, content: t.text }));
+  return {
+    messages: turns.map(t => ({ role: t.role, content: t.text })),
+    resetApplied,
+    gapDays
+  };
 }
 
 export async function handleAgentReply(
@@ -162,15 +222,35 @@ export async function handleAgentReply(
       // best-effort
     }
 
+    // Histórico (com corte de continuidade se o cliente sumiu por vários dias).
+    const resetDays =
+      agent.conversationResetDays === undefined ||
+      agent.conversationResetDays === null
+        ? 0
+        : Number(agent.conversationResetDays);
+    const convo = await buildConversation(ticketId, companyId, resetDays);
+    const messages = convo.messages;
+    if (!messages.length) return;
+
+    // Data/hora atual, para o agente interpretar "ontem", "semana passada" etc.
+    const dateLine = `Data e hora atuais: ${nowInTimezone()} (horário de Brasília). Use isto como "hoje" ao interpretar o cliente (ex.: "ontem", "semana passada") — nunca assuma que ainda é a data da última conversa.`;
+
+    // Retomada após intervalo longo: recomeçar o assunto sem citar o passado.
+    const resumoLine = convo.resetApplied
+      ? `O último contato deste cliente foi há cerca de ${convo.gapDays} dia(s). Comece como um novo atendimento: cumprimente de novo e puxe o assunto do zero. NÃO cite a conversa anterior nem retome pendências antigas a menos que o próprio cliente traga. Você ainda conhece as preferências dele pela memória — use só quando fizer sentido natural.`
+      : "";
+
     const systemPrompt = [
       agent.systemPrompt || "",
       "",
       `Contexto do atendimento: você está conversando com ${
         contactName || "um cliente"
       }${contactNumber ? ` (${contactNumber})` : ""} pelo WhatsApp.`,
+      dateLine,
       ctwaLine,
+      resumoLine,
       memoryLine,
-      "Responda em português do Brasil, de forma objetiva e cordial. Use as ferramentas disponíveis quando precisar consultar dados ou executar ações. Anote na memória (anotar_memoria) os fatos úteis para não repetir perguntas. Transfira para um humano quando não puder resolver."
+      "Responda em português do Brasil. Seja OBJETIVO e econômico: mensagens curtas (2 a 4 frases), uma pergunta por vez, sem repetir o que já foi dito — cada mensagem tem custo. Use as ferramentas quando precisar de dados ou ações; para qualquer pergunta sobre modelos, versões, cores, ano ou preço, consulte consultar_estoque ANTES e responda só com o retorno dela. Anote na memória (anotar_memoria) os fatos úteis para não repetir perguntas. Transfira para um humano quando o cliente estiver pronto para comprar/negociar ou quando você não puder resolver."
     ]
       .filter(Boolean)
       .join("\n");
@@ -185,9 +265,6 @@ export async function handleAgentReply(
       contactNumber,
       transferQueueId: agent.transferQueueId || null
     };
-
-    const messages = await buildConversation(ticketId, companyId);
-    if (!messages.length) return;
 
     const maxSteps = agent.maxToolSteps || 5;
 
@@ -327,6 +404,20 @@ export async function handleAgentReply(
     } else {
       logger.info(
         `[Agente IA] sem texto final para enviar (ticket=${ticketId}).`
+      );
+    }
+
+    // Monitor de inatividade: se o agente respondeu e NÃO transferiu, agenda a
+    // passagem para um humano caso o cliente fique X min sem responder. Se
+    // transferiu, cancela qualquer verificação pendente.
+    if (transferred) {
+      await cancelInactivityCheck(ticketId);
+    } else if (finalText && Number(agent.inactivityTimeoutMinutes) > 0) {
+      await scheduleInactivityCheck(
+        ticketId,
+        companyId,
+        Number(agent.inactivityTimeoutMinutes),
+        agent.transferQueueId || null
       );
     }
 

@@ -102,6 +102,20 @@ class AIAgent extends Model<AIAgent> {
   @Column(DataType.JSONB)
   guardrails: any;
 
+  // Minutos sem resposta do cliente para transferir ao humano (0 = desligado).
+  // O agente responde, aguarda; se o cliente ficar em silêncio por este tempo,
+  // o lead é repassado a um vendedor. Ver AgentInactivityQueue.
+  @Default(0)
+  @Column
+  inactivityTimeoutMinutes: number;
+
+  // Dias de intervalo para "recomeçar o assunto": se o cliente volta após este
+  // tempo, o histórico é cortado no ponto de retomada e o agente inicia um novo
+  // atendimento (preferências continuam vindo da memória). 0 = nunca corta.
+  @Default(3)
+  @Column
+  conversationResetDays: number;
+
   @HasMany(() => Queue)
   queues: Queue[];
 

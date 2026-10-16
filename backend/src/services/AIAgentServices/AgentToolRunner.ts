@@ -464,36 +464,37 @@ export async function executeTool(
 }
 
 /**
- * Transfere o atendimento: move o ticket para a fila de atendimento humano
- * (SEMPRE sai da fila do agente) e desliga o agente nesse ticket.
- * Ordem do destino: fila citada pelo modelo -> fila de transferência do agente
- * -> fila padrão "Atendimento Humano" (criada se não existir).
+ * Núcleo da transferência (reutilizável): move o ticket para a fila de
+ * atendimento humano (SEMPRE sai da fila do agente) e desliga o agente nesse
+ * ticket. Ordem do destino: fila citada -> fila de transferência do agente ->
+ * fila padrão "Atendimento Humano" (criada se não existir). Usado pela
+ * ferramenta de transferência E pelo monitor de inatividade.
+ * Devolve o id da fila de destino (ou null).
  */
-async function executeTransfer(
-  input: any,
-  ctx: AgentToolContext
-): Promise<ToolExecutionResult> {
-  const ticket = await Ticket.findByPk(ctx.ticketId);
-  if (!ticket) {
-    return { content: "Ticket não encontrado para transferir.", isError: true };
-  }
+export async function transferTicketToHuman(params: {
+  companyId: number;
+  ticketId: number;
+  transferQueueId?: number | null;
+  filaNome?: string;
+  motivo?: string;
+}): Promise<number | null> {
+  const { companyId, ticketId, transferQueueId, filaNome, motivo } = params;
+  const ticket = await Ticket.findByPk(ticketId);
+  if (!ticket) return null;
 
   let targetQueueId: number | null = null;
 
-  const filaNome = input?.fila ? String(input.fila).trim() : "";
   if (filaNome) {
     const queue = await Queue.findOne({
-      where: { name: filaNome, companyId: ctx.companyId }
+      where: { name: filaNome.trim(), companyId }
     });
     if (queue) targetQueueId = queue.id;
   }
-
-  if (!targetQueueId && ctx.transferQueueId) {
-    targetQueueId = ctx.transferQueueId;
+  if (!targetQueueId && transferQueueId) {
+    targetQueueId = transferQueueId;
   }
-
   if (!targetQueueId) {
-    const humanQueue = await getOrCreateHumanQueue(ctx.companyId);
+    const humanQueue = await getOrCreateHumanQueue(companyId);
     if (humanQueue) targetQueueId = humanQueue.id;
   }
 
@@ -509,12 +510,12 @@ async function executeTransfer(
 
   try {
     const io = getIO();
-    const fullTicket = await ShowTicketService(ctx.ticketId, ctx.companyId);
-    io.to(ctx.ticketId.toString())
-      .to(`company-${ctx.companyId}-pending`)
-      .to(`company-${ctx.companyId}-notification`)
+    const fullTicket = await ShowTicketService(ticketId, companyId);
+    io.to(ticketId.toString())
+      .to(`company-${companyId}-pending`)
+      .to(`company-${companyId}-notification`)
       .to(`queue-${targetQueueId}-pending`)
-      .emit(`company-${ctx.companyId}-ticket`, {
+      .emit(`company-${companyId}-ticket`, {
         action: "update",
         ticket: fullTicket
       });
@@ -523,10 +524,32 @@ async function executeTransfer(
   }
 
   logger.info(
-    `[Agente IA] TRANSFERIDO ticket=${ctx.ticketId} -> fila=${
+    `[Agente IA] TRANSFERIDO ticket=${ticketId} -> fila=${
       targetQueueId || ticket.queueId
-    } (agente desligado). Motivo: ${input?.motivo || "-"}`
+    } (agente desligado). Motivo: ${motivo || "-"}`
   );
+  return targetQueueId;
+}
+
+/**
+ * Transferência pedida pelo modelo (ferramenta nativa).
+ */
+async function executeTransfer(
+  input: any,
+  ctx: AgentToolContext
+): Promise<ToolExecutionResult> {
+  const ticket = await Ticket.findByPk(ctx.ticketId);
+  if (!ticket) {
+    return { content: "Ticket não encontrado para transferir.", isError: true };
+  }
+
+  await transferTicketToHuman({
+    companyId: ctx.companyId,
+    ticketId: ctx.ticketId,
+    transferQueueId: ctx.transferQueueId || null,
+    filaNome: input?.fila ? String(input.fila) : undefined,
+    motivo: input?.motivo
+  });
 
   return {
     content:
