@@ -17,7 +17,10 @@ import {
   AgentToolContext,
   buildAnthropicTools,
   executeTool,
-  findToolDef
+  findToolDef,
+  transferTicketToHuman,
+  MEMORY_TOOL_NAME,
+  ESTOQUE_TOOL_NAME
 } from "./AgentToolRunner";
 import {
   loadMemory,
@@ -48,7 +51,7 @@ import {
  * Tudo protegido por try/catch — uma falha do agente NUNCA quebra o atendimento.
  */
 
-const HISTORY_LIMIT = 40;
+const HISTORY_LIMIT = Number(process.env.AGENT_HISTORY_LIMIT || 20);
 const AGENT_TIMEZONE = process.env.AGENT_TIMEZONE || "America/Sao_Paulo";
 
 // Trava simples em memória para não rodar o agente duas vezes no mesmo ticket
@@ -76,6 +79,100 @@ interface ConversationBuild {
   messages: AnthropicMessage[];
   resetApplied: boolean; // histórico foi cortado por intervalo longo
   gapDays: number; // dias desde o último contato (quando houve corte)
+}
+
+const stripAccents = (s: string): string =>
+  (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+const normalizeText = (s: string): string =>
+  stripAccents(String(s || ""))
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const wordSet = (s: string): Set<string> =>
+  new Set(normalizeText(s).split(" ").filter(w => w.length > 2));
+
+const jaccard = (a: Set<string>, b: Set<string>): number => {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  a.forEach(w => {
+    if (b.has(w)) inter += 1;
+  });
+  return inter / (a.size + b.size - inter);
+};
+
+// Cliente pedindo/insistindo em desconto.
+const DISCOUNT_RE = /(descont|abaix|mais barat|melhor(a|ar)?\s*o?\s*pre|ultimo\s*pre|ultima?\s*oferta|faz\s*por|cobre|cobrir|preco\s*menor|baratinh|desconta|chora)/;
+
+/** Monta o bloco de campanhas vigentes (só as ativas) para o contexto. */
+function formatCampaigns(campaigns: any[]): string {
+  const active = (Array.isArray(campaigns) ? campaigns : []).filter(
+    c => c && c.ativo !== false && (c.titulo || c.descricao)
+  );
+  if (!active.length) return "";
+  const lines = active.slice(0, 10).map(c => {
+    const val = c.validade ? ` (válido até ${c.validade})` : "";
+    const desc = c.descricao ? `: ${c.descricao}` : "";
+    return `- ${c.titulo || "Campanha"}${desc}${val}`;
+  });
+  return [
+    "CAMPANHAS/CONDIÇÕES VIGENTES (cite quando fizer sentido; use SÓ o que está aqui, não invente outras nem prometa valores além destes):",
+    ...lines
+  ].join("\n");
+}
+
+/**
+ * Discernimento de handoff: decide, em código, quando a conversa travou e deve
+ * ir para um humano — agente repetindo as mesmas respostas, ou cliente
+ * insistindo em desconto além do limite. Rede de segurança do que o prompt
+ * também orienta. Retorna motivo quando deve transferir.
+ */
+function detectStuck(
+  messages: AnthropicMessage[],
+  threshold: number
+): { stuck: boolean; reason?: string } {
+  if (!threshold || threshold <= 0) return { stuck: false };
+
+  const assistants = messages
+    .filter(m => m.role === "assistant")
+    .map(m => String(m.content || ""));
+  const users = messages
+    .filter(m => m.role === "user")
+    .map(m => String(m.content || ""));
+
+  // 1) Agente em loop: últimas N respostas muito parecidas entre si.
+  if (assistants.length >= threshold) {
+    const last = assistants.slice(-threshold).map(wordSet);
+    const sims: number[] = [];
+    for (let i = 1; i < last.length; i += 1) {
+      sims.push(jaccard(last[i - 1], last[i]));
+    }
+    const avg = sims.length
+      ? sims.reduce((a, b) => a + b, 0) / sims.length
+      : 0;
+    if (avg >= 0.72) {
+      return {
+        stuck: true,
+        reason: `Conversa repetitiva: o agente repetiu respostas semelhantes ${threshold}x.`
+      };
+    }
+  }
+
+  // 2) Cliente insistindo em desconto além do limite.
+  const recentUsers = users.slice(-10);
+  const discountCount = recentUsers.filter(t =>
+    DISCOUNT_RE.test(normalizeText(t))
+  ).length;
+  if (discountCount >= threshold) {
+    return {
+      stuck: true,
+      reason: `Cliente insistiu em desconto/negociação ${discountCount}x — melhor um vendedor assumir.`
+    };
+  }
+
+  return { stuck: false };
 }
 
 /**
@@ -250,7 +347,15 @@ export async function handleAgentReply(
       ctwaLine,
       resumoLine,
       memoryLine,
-      "Responda em português do Brasil. Seja OBJETIVO e econômico: mensagens curtas (2 a 4 frases), uma pergunta por vez, sem repetir o que já foi dito — cada mensagem tem custo. Use as ferramentas quando precisar de dados ou ações; para qualquer pergunta sobre modelos, versões, cores, ano ou preço, consulte consultar_estoque ANTES e responda só com o retorno dela. Anote na memória (anotar_memoria) os fatos úteis para não repetir perguntas. Transfira para um humano quando o cliente estiver pronto para comprar/negociar ou quando você não puder resolver."
+      formatCampaigns(agent.campaigns),
+      "REGRAS FIXAS:",
+      "• SEMPRE responda ao cliente em texto no mesmo turno — nunca termine só chamando ferramentas.",
+      "• Seja objetivo e econômico: 2 a 4 frases curtas, uma pergunta por vez, sem repetir o que já foi dito (cada mensagem tem custo).",
+      "• Modelos/preço/ano/km/cores: consulte consultar_estoque ANTES e responda só com o retorno dela; nunca invente.",
+      "• 0km (carros novos): trabalhamos SOMENTE com Volkswagen. Seminovos/usados: a Francauto vende MULTIMARCAS — fique aberto a qualquer marca, não empurre VW no usado.",
+      "• Memória (anotar_memoria): no máximo uma anotação curta por resposta, só de fato novo e útil, e ainda assim responda ao cliente no mesmo turno.",
+      "• Transfira para um humano quando o cliente agendar visita, quiser negociar/fechar, pedir uma pessoa, ou quando você não puder resolver.",
+      "• Responda em português do Brasil."
     ]
       .filter(Boolean)
       .join("\n");
@@ -266,9 +371,48 @@ export async function handleAgentReply(
       transferQueueId: agent.transferQueueId || null
     };
 
+    // Discernimento de handoff (rede de segurança em código): se a conversa
+    // travou — agente repetindo respostas ou cliente implorando desconto além
+    // do limite — passa para um humano em vez de insistir. Sem chamar o modelo.
+    const stuck = detectStuck(
+      messages,
+      Number(agent.repeatTransferThreshold) || 0
+    );
+    if (stuck.stuck) {
+      await transferTicketToHuman({
+        companyId,
+        ticketId,
+        transferQueueId: agent.transferQueueId || null,
+        motivo: stuck.reason
+      });
+      transferred = true;
+      finalText =
+        "Pra te atender melhor, vou te passar para um vendedor que cuida pessoalmente das condições, tá? Já já alguém fala com você. 😊";
+      toolCalls.push({
+        name: "handoff_repeticao",
+        status: "transfer",
+        reason: stuck.reason
+      });
+      logger.info(
+        `[Agente IA] handoff por repetição/insistência ticket=${ticketId}: ${stuck.reason}`
+      );
+    }
+
     const maxSteps = agent.maxToolSteps || 5;
 
-    for (let step = 0; step <= maxSteps; step += 1) {
+    // Controle de uso de ferramentas no turno:
+    //  - externalCalls: só http/webhook/estoque contam para o guardrail (memória
+    //    e transferência são internas e não devem estourar o limite).
+    //  - memória: no máximo MEMORY_MAX_PER_TURN anotações e sem repetir a mesma,
+    //    para o agente parar de "só anotar" e RESPONDER ao cliente.
+    const MEMORY_MAX_PER_TURN = 2;
+    let externalCalls = 0;
+    let memoryCalls = 0;
+    const memoryWritten = new Set<string>();
+
+    // Só roda o laço do modelo se não transferimos por repetição acima.
+    if (!transferred)
+      for (let step = 0; step <= maxSteps; step += 1) {
       steps += 1;
       // eslint-disable-next-line no-await-in-loop
       const resp = await callMessages({
@@ -301,14 +445,35 @@ export async function handleAgentReply(
         // eslint-disable-next-line no-restricted-syntax
         for (const tu of toolUses) {
           const def = findToolDef(agent.tools, tu.name);
+          const isMemory = tu.name === MEMORY_TOOL_NAME;
+          const isExternal = !!def || tu.name === ESTOQUE_TOOL_NAME;
 
-          // GUARDRAIL determinístico ANTES de executar a ferramenta.
+          // Memória: limita quantidade por turno e evita repetição — assim o
+          // modelo não gasta o turno "só anotando" e volta a responder.
+          if (isMemory) {
+            const sig = `${tu.input?.chave}=${tu.input?.valor}`;
+            if (memoryCalls >= MEMORY_MAX_PER_TURN || memoryWritten.has(sig)) {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: tu.id,
+                content:
+                  "Memória suficiente por agora — PARE de anotar e responda ao cliente em texto neste turno."
+              });
+              // eslint-disable-next-line no-continue
+              continue;
+            }
+            memoryWritten.add(sig);
+            memoryCalls += 1;
+          }
+
+          // GUARDRAIL determinístico ANTES de executar — só ferramentas
+          // externas (http/webhook/estoque) contam para o limite por turno.
           const decision = checkToolCall({
             cfg: guardrails,
             toolName: tu.name,
             input: tu.input,
             toolDef: def,
-            callsSoFar: toolCalls.filter(c => !c.blocked).length
+            callsSoFar: isExternal ? externalCalls : 0
           });
 
           if (!decision.allowed) {
@@ -329,6 +494,8 @@ export async function handleAgentReply(
             // eslint-disable-next-line no-continue
             continue;
           }
+
+          if (isExternal) externalCalls += 1;
 
           const startedAt = Date.now();
           // eslint-disable-next-line no-await-in-loop
@@ -365,6 +532,13 @@ export async function handleAgentReply(
           });
         }
         messages.push({ role: "user", content: toolResults });
+        if (transferred) {
+          // Transferiu no meio das ferramentas: não precisa continuar o loop.
+          finalText =
+            extractText(resp.content) ||
+            "Perfeito! Já estou te passando para um vendedor dar sequência. 😊";
+          break;
+        }
         // continua o loop para o modelo concluir com base nos resultados
       } else {
         finalText = extractText(resp.content);
@@ -372,10 +546,10 @@ export async function handleAgentReply(
       }
     }
 
-    // Rede de segurança: se o loop acabou ainda pedindo ferramenta (estourou o
-    // limite de passos) e não temos texto, faz UMA chamada final SEM ferramentas
-    // para o modelo concluir em texto — assim o cliente nunca fica sem resposta.
-    if (!finalText) {
+    // Rede de segurança: se o loop acabou sem texto (ex.: estourou passos ou o
+    // modelo só chamou ferramentas), faz até 2 chamadas finais SEM ferramentas,
+    // instruindo a responder em texto — assim o cliente nunca fica sem resposta.
+    for (let tryN = 0; !finalText && !transferred && tryN < 2; tryN += 1) {
       try {
         steps += 1;
         const closing = await callMessages({
@@ -383,7 +557,7 @@ export async function handleAgentReply(
           model: agent.model,
           maxTokens: agent.maxTokens,
           temperature: Number(agent.temperature),
-          system: systemPrompt,
+          system: `${systemPrompt}\n\nIMPORTANTE: responda AGORA ao cliente em português, de forma curta e útil. NÃO chame ferramentas.`,
           messages,
           workspaceId: agent.anthropicWorkspaceId || undefined
         });
@@ -393,6 +567,7 @@ export async function handleAgentReply(
         finalText = extractText(closing.content);
       } catch (e) {
         describeAnthropicError(e);
+        break;
       }
     }
 

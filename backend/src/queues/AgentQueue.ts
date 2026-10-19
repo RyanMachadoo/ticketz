@@ -30,7 +30,16 @@ interface AgentJob {
   companyId: number;
 }
 
-agentQueue.process(async job => {
+// Concorrência: processa vários tickets em paralelo para não serializar as
+// respostas sob carga (cada resposta espera a API da Anthropic). Ajustável por
+// env AGENT_CONCURRENCY. A trava por ticket (runningTickets, no HandleAgentReply)
+// evita rodar o MESMO ticket duas vezes ao mesmo tempo.
+const AGENT_CONCURRENCY = Math.max(
+  1,
+  Number(process.env.AGENT_CONCURRENCY || 4)
+);
+
+agentQueue.process(AGENT_CONCURRENCY, async job => {
   const { ticketId, companyId } = job.data as AgentJob;
   await handleAgentReply(ticketId, companyId);
 });

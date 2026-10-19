@@ -100,6 +100,8 @@ const defaultForm = {
   maxToolSteps: 5,
   inactivityTimeoutMinutes: 30,
   conversationResetDays: 3,
+  repeatTransferThreshold: 3,
+  campaigns: [],
   isActive: true,
   systemPrompt: "",
   tools: [],
@@ -157,6 +159,12 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
               data.conversationResetDays === null
                 ? 3
                 : Number(data.conversationResetDays),
+            repeatTransferThreshold:
+              data.repeatTransferThreshold === undefined ||
+              data.repeatTransferThreshold === null
+                ? 3
+                : Number(data.repeatTransferThreshold),
+            campaigns: Array.isArray(data.campaigns) ? data.campaigns : [],
             isActive: data.isActive !== undefined ? data.isActive : true,
             systemPrompt: data.systemPrompt || "",
             tools: Array.isArray(data.tools) ? data.tools : [],
@@ -197,6 +205,28 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
 
   const setGuardrail = (field, value) =>
     setForm(f => ({ ...f, guardrails: { ...f.guardrails, [field]: value } }));
+
+  // ---- campaigns helpers ----
+  const addCampaign = () =>
+    setForm(f => ({
+      ...f,
+      campaigns: [
+        ...f.campaigns,
+        { titulo: "", descricao: "", validade: "", ativo: true }
+      ]
+    }));
+
+  const updateCampaign = (idx, patch) =>
+    setForm(f => ({
+      ...f,
+      campaigns: f.campaigns.map((c, i) => (i === idx ? { ...c, ...patch } : c))
+    }));
+
+  const removeCampaign = idx =>
+    setForm(f => ({
+      ...f,
+      campaigns: f.campaigns.filter((_, i) => i !== idx)
+    }));
 
   // ---- tools helpers ----
   const addTool = kind =>
@@ -262,6 +292,8 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         maxToolSteps: Number(form.maxToolSteps) || 5,
         inactivityTimeoutMinutes: Number(form.inactivityTimeoutMinutes) || 0,
         conversationResetDays: Number(form.conversationResetDays) || 0,
+        repeatTransferThreshold: Number(form.repeatTransferThreshold) || 0,
+        campaigns: form.campaigns,
         isActive: form.isActive,
         systemPrompt: form.systemPrompt,
         tools: form.tools,
@@ -629,6 +661,20 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             />
           </Grid>
           <Grid item xs={6} sm={3}>
+            <TextField
+              label={i18n.t("aiAgents.modal.repeatTransfer")}
+              helperText={i18n.t("aiAgents.modal.repeatTransferHint")}
+              type="number"
+              inputProps={{ min: 0 }}
+              value={form.repeatTransferThreshold}
+              onChange={e =>
+                setField("repeatTransferThreshold", e.target.value)
+              }
+              fullWidth
+              margin="dense"
+            />
+          </Grid>
+          <Grid item xs={6} sm={3}>
             <FormControlLabel
               control={
                 <Switch
@@ -703,6 +749,85 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             />
           </Grid>
         </Grid>
+
+        <Divider className={classes.section} />
+        <Typography variant="subtitle1">
+          {i18n.t("aiAgents.modal.campaignsTitle")}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          className={classes.hint}
+        >
+          {i18n.t("aiAgents.modal.campaignsHint")}
+        </Typography>
+
+        {form.campaigns.map((c, idx) => (
+          <Paper variant="outlined" className={classes.toolCard} key={idx}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={c.ativo !== false}
+                    onChange={e =>
+                      updateCampaign(idx, { ativo: e.target.checked })
+                    }
+                    color="primary"
+                  />
+                }
+                label={i18n.t("aiAgents.modal.campaignActive")}
+              />
+              <IconButton size="small" onClick={() => removeCampaign(idx)}>
+                <DeleteOutline fontSize="small" />
+              </IconButton>
+            </div>
+            <Grid container spacing={1}>
+              <Grid item xs={12} sm={8}>
+                <TextField
+                  label={i18n.t("aiAgents.modal.campaignTitle")}
+                  value={c.titulo || ""}
+                  onChange={e => updateCampaign(idx, { titulo: e.target.value })}
+                  fullWidth
+                  margin="dense"
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label={i18n.t("aiAgents.modal.campaignValidity")}
+                  value={c.validade || ""}
+                  onChange={e =>
+                    updateCampaign(idx, { validade: e.target.value })
+                  }
+                  fullWidth
+                  margin="dense"
+                  placeholder="31/10/2026"
+                />
+              </Grid>
+            </Grid>
+            <TextField
+              label={i18n.t("aiAgents.modal.campaignDesc")}
+              value={c.descricao || ""}
+              onChange={e => updateCampaign(idx, { descricao: e.target.value })}
+              fullWidth
+              margin="dense"
+              multiline
+            />
+          </Paper>
+        ))}
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<AddCircleOutline />}
+          onClick={addCampaign}
+        >
+          {i18n.t("aiAgents.modal.addCampaign")}
+        </Button>
 
         <Divider className={classes.section} />
         <Typography variant="subtitle1">

@@ -309,6 +309,17 @@ const messages = {
           conversationResetDays: "Restart topic after (days)",
           conversationResetDaysHint:
             "If the customer returns after this gap, the agent restarts the topic fresh (preferences come from memory). 0 = never.",
+          repeatTransfer: "Transfer after repeats",
+          repeatTransferHint:
+            "Number of repeats (agent looping or customer begging for a discount) before handing to a salesperson. 0 = off.",
+          campaignsTitle: "Campaigns / Current offers",
+          campaignsHint:
+            "Edit campaigns here without touching the prompt. Only active ones are sent to the agent, which cites only what is written (never invents or promises values beyond these).",
+          addCampaign: "Add campaign",
+          campaignActive: "Active",
+          campaignTitle: "Campaign title",
+          campaignValidity: "Valid until (optional)",
+          campaignDesc: "Description / terms",
           active: "Active",
           queues: "Served queues",
           queuesHint:

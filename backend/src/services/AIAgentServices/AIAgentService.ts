@@ -23,6 +23,22 @@ export interface AIAgentData {
   guardrails?: any;
   inactivityTimeoutMinutes?: number;
   conversationResetDays?: number;
+  campaigns?: any[];
+  repeatTransferThreshold?: number;
+}
+
+/** Normaliza a lista de campanhas vinda da UI. */
+function sanitizeCampaigns(raw: any): any[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(c => ({
+      titulo: String(c?.titulo || "").trim().slice(0, 120),
+      descricao: String(c?.descricao || "").trim().slice(0, 600),
+      validade: String(c?.validade || "").trim().slice(0, 60),
+      ativo: c?.ativo === undefined ? true : !!c.ativo
+    }))
+    .filter(c => c.titulo || c.descricao)
+    .slice(0, 20);
 }
 
 /** Normaliza/saneia a config de guardrails recebida da UI. */
@@ -162,6 +178,11 @@ export async function createAgent(
     conversationResetDays:
       data.conversationResetDays !== undefined
         ? Math.max(0, Math.floor(Number(data.conversationResetDays) || 0))
+        : 3,
+    campaigns: sanitizeCampaigns(data.campaigns),
+    repeatTransferThreshold:
+      data.repeatTransferThreshold !== undefined
+        ? Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0))
         : 3
   } as any);
 
@@ -217,7 +238,15 @@ export async function updateAgent(
     conversationResetDays:
       data.conversationResetDays === undefined
         ? agent.conversationResetDays
-        : Math.max(0, Math.floor(Number(data.conversationResetDays) || 0))
+        : Math.max(0, Math.floor(Number(data.conversationResetDays) || 0)),
+    campaigns:
+      data.campaigns === undefined
+        ? agent.campaigns
+        : sanitizeCampaigns(data.campaigns),
+    repeatTransferThreshold:
+      data.repeatTransferThreshold === undefined
+        ? agent.repeatTransferThreshold
+        : Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0))
   };
 
   // Só troca a chave quando vier uma nova não vazia (mantém a atual caso contrário).

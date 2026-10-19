@@ -198,7 +198,7 @@ function estoqueToolDef(description?: string): AnthropicTool {
     name: ESTOQUE_TOOL_NAME,
     description:
       description ||
-      "Consulta o estoque de veículos da concessionária (0km e usados) em tempo real. Use SEMPRE que o cliente perguntar se tem um modelo, pedir opções, faixa de preço, ou quiser ver carros disponíveis — nunca invente modelos, anos, km ou preços: consulte aqui. Você pode filtrar por tipo (novos/usados), modelo, preço máximo, ano mínimo, câmbio e combustível. Depois de mostrar as opções, puxe o cliente para agendar uma visita/test drive e transfira para um vendedor.",
+      "Consulta o estoque de veículos em tempo real. Use SEMPRE que o cliente perguntar se tem um modelo, pedir opções, faixa de preço, ou quiser ver carros — nunca invente modelos, anos, km ou preços. Importante: 0km (tipo 'novos') são SOMENTE Volkswagen; usados/seminovos (tipo 'usados') são MULTIMARCAS (várias marcas) — não restrinja a VW no usado. Filtre por tipo, modelo, preço (preco_max/preco_min), ano mínimo, câmbio e combustível para trazer poucas opções certeiras. Depois de mostrar, puxe o cliente para agendar uma visita/test drive.",
     input_schema: {
       type: "object",
       properties: {
@@ -635,7 +635,9 @@ async function executeEstoque(
       {
         baseUrl: def?.baseUrl,
         path: def?.path,
-        limit: Number(def?.limit) || 20
+        // Poucos itens para o modelo (economia de token); contagens e faixa de
+        // preço vêm no cabeçalho. O cliente refina por modelo/preço se precisar.
+        limit: Number(def?.limit) || 8
       },
       filtro
     );

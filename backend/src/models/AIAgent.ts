@@ -116,6 +116,19 @@ class AIAgent extends Model<AIAgent> {
   @Column
   conversationResetDays: number;
 
+  // Campanhas/condições vigentes, editáveis FORA do prompt principal. Só as
+  // ativas são injetadas no contexto do agente a cada resposta. Formato:
+  // [{ titulo, descricao, validade?, ativo }]. Ver HandleAgentReply.
+  @Default([])
+  @Column(DataType.JSONB)
+  campaigns: any[];
+
+  // Discernimento de handoff: após este nº de repetições (agente em loop OU
+  // cliente insistindo em desconto), transfere para um humano. 0 = desligado.
+  @Default(3)
+  @Column
+  repeatTransferThreshold: number;
+
   @HasMany(() => Queue)
   queues: Queue[];
 

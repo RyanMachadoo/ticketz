@@ -307,6 +307,17 @@ const messages = {
           conversationResetDays: "Reiniciar tema tras (días)",
           conversationResetDaysHint:
             "Si el cliente vuelve tras este intervalo, el agente reinicia el tema desde cero (las preferencias vienen de la memoria). 0 = nunca.",
+          repeatTransfer: "Transferir tras repeticiones",
+          repeatTransferHint:
+            "Nº de repeticiones (agente en bucle o cliente insistiendo en descuento) para pasar a un vendedor. 0 = desactivado.",
+          campaignsTitle: "Campañas / Condiciones vigentes",
+          campaignsHint:
+            "Edite las campañas aquí sin tocar el prompt. Solo las activas se envían al agente, que cita únicamente lo escrito (no inventa ni promete valores más allá de estos).",
+          addCampaign: "Agregar campaña",
+          campaignActive: "Activa",
+          campaignTitle: "Título de la campaña",
+          campaignValidity: "Válido hasta (opcional)",
+          campaignDesc: "Descripción / condición",
           active: "Activo",
           queues: "Colas atendidas",
           queuesHint:
