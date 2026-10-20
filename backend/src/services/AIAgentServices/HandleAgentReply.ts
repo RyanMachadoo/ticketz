@@ -274,13 +274,23 @@ export async function handleAgentReply(
   try {
     const ticket = await Ticket.findByPk(ticketId);
     if (!ticket || ticket.companyId !== companyId) return;
-    if (ticket.useAgent === false) return; // transferido / desligado
     if (ticket.status === "closed") return;
-    // Controle é pela fila (não por userId): atua enquanto estiver na fila do agente.
+    // Controle é pela FILA: a IA atua enquanto o ticket estiver numa fila com
+    // agente. Sem fila ou fila sem agente → não atua.
     if (!ticket.queueId) return;
 
     const queue = await Queue.findByPk(ticket.queueId);
     if (!queue || !queue.aiAgentId) return;
+
+    // Reativação: se o ticket voltou para uma fila COM IA depois de ter sido
+    // transferido (useAgent=false), religa o agente — estar numa fila de IA é o
+    // sinal de que a IA deve atender de novo.
+    if (ticket.useAgent === false) {
+      await ticket.update({ useAgent: true });
+      logger.info(
+        `[Agente IA] ticket=${ticketId} voltou para fila com IA — agente reativado.`
+      );
+    }
 
     const agent = await AIAgent.findByPk(queue.aiAgentId);
     if (!agent || !agent.isActive) return;

@@ -498,14 +498,21 @@ export async function transferTicketToHuman(params: {
     if (humanQueue) targetQueueId = humanQueue.id;
   }
 
-  // useAgent=false garante que o agente para mesmo se, no pior caso, não houver
-  // fila de destino (aí o ticket só fica pendente na fila atual).
+  // NUNCA transfira para uma fila que tenha IA (senão o agente reassume na hora).
+  if (targetQueueId) {
+    const target = await Queue.findByPk(targetQueueId);
+    if (target && target.aiAgentId) targetQueueId = null;
+  }
+
+  // O destino SEMPRE sai da fila do agente. Se não há fila humana resolvida,
+  // o ticket fica sem fila (pendente) — garante que o agente para de atuar sem
+  // depender só do useAgent (que é reativado ao voltar para uma fila com IA).
   await ticket.update({
     useAgent: false,
     chatbot: false,
     status: "pending",
     userId: null,
-    queueId: targetQueueId || ticket.queueId
+    queueId: targetQueueId
   });
 
   try {

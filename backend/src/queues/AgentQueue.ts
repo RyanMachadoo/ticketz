@@ -67,15 +67,10 @@ export function maybeEnqueueAgent(message: Message): void {
       logger.info(`[Agente IA] ticket=${ticket.id} NÃO atua: ticket fechado.`);
       return;
     }
-    // Obs.: NÃO bloqueamos por userId. O controle é pela FILA: enquanto o ticket
-    // estiver na fila do agente (e useAgent != false), o agente responde. Para
-    // parar, transfira para outra fila (ou desligue com useAgent=false).
-    if (ticket.useAgent === false) {
-      logger.info(
-        `[Agente IA] ticket=${ticket.id} NÃO atua: já transferido/desligado (useAgent=false).`
-      );
-      return;
-    }
+    // Obs.: o controle é pela FILA. NÃO bloqueamos por userId nem por useAgent
+    // aqui: se o ticket está numa fila COM IA, enfileiramos. O HandleAgentReply
+    // reativa o agente (useAgent=true) caso o ticket tenha voltado para a fila
+    // da IA após um transfer. Para parar a IA, transfira para uma fila SEM IA.
 
     // jobId por "janela de tempo": mensagens do mesmo intervalo colapsam num
     // único job (debounce). Ao rodar, o handler lê todo o histórico.
