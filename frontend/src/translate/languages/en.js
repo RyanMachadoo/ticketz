@@ -320,6 +320,16 @@ const messages = {
           campaignTitle: "Campaign title",
           campaignValidity: "Valid until (optional)",
           campaignDesc: "Description / terms",
+          sellersTitle: "Salespeople (round-robin)",
+          sellersHint:
+            "Salespeople use their own WhatsApp. On handoff, the agent picks one (customer preference or round-robin) and sends the lead with context to their WhatsApp. Keep only active ones; empty = transfer without notifying a seller.",
+          addSeller: "Add salesperson",
+          sellerActive: "Active",
+          sellerName: "Salesperson name",
+          sellerNumber: "WhatsApp (digits only, with country+area code)",
+          sellerNumberHint: "e.g. 5516999998888",
+          sellerAliases: "Aliases (optional)",
+          sellerAliasesHint: "Comma-separated; helps match the customer's preference.",
           active: "Active",
           queues: "Served queues",
           queuesHint:

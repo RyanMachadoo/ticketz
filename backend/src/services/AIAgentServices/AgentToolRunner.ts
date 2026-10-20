@@ -16,6 +16,8 @@ import {
   EstoqueFiltro,
   EstoqueVeiculo
 } from "../EstoqueServices/EstoqueService";
+import AIAgent from "../../models/AIAgent";
+import { handoffToSeller, HandoffResult } from "./AgentSellerService";
 
 export const HUMAN_QUEUE_NAME = "Atendimento Humano";
 
@@ -143,14 +145,19 @@ function transferToolDef(description?: string): AnthropicTool {
     name: TRANSFER_TOOL_NAME,
     description:
       description ||
-      "Transfere o atendimento para um atendente humano. CHAME esta ferramenta (não apenas prometa que vai transferir) quando: o cliente AGENDAR/confirmar uma visita ou test drive (passe para um vendedor confirmar); pedir para falar com uma pessoa; entrar em negociação de preço/desconto/financiamento/avaliação de troca; quiser fechar/reservar/pagar; for pós-venda/oficina/garantia/reclamação; ou quando você não conseguir resolver ou a ferramenta de consulta falhar. Importante: se você disser ao cliente que vai transferir, você DEVE chamar esta ferramenta na mesma resposta. Ao usar, o atendimento SAI da sua fila e você para de responder.",
+      "Transfere o atendimento para um vendedor. CHAME esta ferramenta (não apenas prometa que vai transferir) quando: o cliente AGENDAR/confirmar uma visita ou test drive; pedir para falar com uma pessoa; entrar em negociação de preço/desconto/financiamento/avaliação de troca; quiser fechar/reservar/pagar; for pós-venda/oficina/garantia/reclamação; ou quando você não conseguir resolver. ANTES de transferir, pergunte ao cliente se ele já tem um vendedor de preferência na Francauto e, se tiver, passe o nome em 'vendedor_preferencia'. Se você disser que vai transferir, DEVE chamar esta ferramenta na mesma resposta. Ao usar, o atendimento sai com você e um vendedor assume.",
     input_schema: {
       type: "object",
       properties: {
         motivo: {
           type: "string",
           description:
-            "Motivo da transferência e um resumo do que já coletou (nome, interesse, melhor horário)."
+            "Resumo do lead para o vendedor: nome, interesse (modelo/0km ou usado), faixa de preço, carro na troca, melhor horário e o que ficou combinado."
+        },
+        vendedor_preferencia: {
+          type: "string",
+          description:
+            "Nome do vendedor que o cliente pediu, se ele indicou algum. Deixe vazio se o cliente não tem preferência (aí entra o rodízio)."
         },
         fila: {
           type: "string",
@@ -471,16 +478,42 @@ export async function executeTool(
  * ferramenta de transferência E pelo monitor de inatividade.
  * Devolve o id da fila de destino (ou null).
  */
+export interface TransferResult {
+  targetQueueId: number | null;
+  seller: HandoffResult | null;
+}
+
 export async function transferTicketToHuman(params: {
   companyId: number;
   ticketId: number;
   transferQueueId?: number | null;
   filaNome?: string;
   motivo?: string;
-}): Promise<number | null> {
-  const { companyId, ticketId, transferQueueId, filaNome, motivo } = params;
+  sellerPreference?: string;
+}): Promise<TransferResult> {
+  const {
+    companyId,
+    ticketId,
+    transferQueueId,
+    filaNome,
+    motivo,
+    sellerPreference
+  } = params;
   const ticket = await Ticket.findByPk(ticketId);
-  if (!ticket) return null;
+  if (!ticket) return { targetQueueId: null, seller: null };
+
+  // Carrega o agente da fila ATUAL (antes de mover) para o rodízio de vendedores.
+  let agent: AIAgent | null = null;
+  try {
+    if (ticket.queueId) {
+      const origQueue = await Queue.findByPk(ticket.queueId);
+      if (origQueue && origQueue.aiAgentId) {
+        agent = await AIAgent.findByPk(origQueue.aiAgentId);
+      }
+    }
+  } catch (e) {
+    // best-effort
+  }
 
   let targetQueueId: number | null = null;
 
@@ -515,9 +548,10 @@ export async function transferTicketToHuman(params: {
     queueId: targetQueueId
   });
 
+  let fullTicket: any = null;
   try {
     const io = getIO();
-    const fullTicket = await ShowTicketService(ticketId, companyId);
+    fullTicket = await ShowTicketService(ticketId, companyId);
     io.to(ticketId.toString())
       .to(`company-${companyId}-pending`)
       .to(`company-${companyId}-notification`)
@@ -530,12 +564,27 @@ export async function transferTicketToHuman(params: {
     // socket é best-effort
   }
 
+  // Rodízio: avisa um vendedor no WhatsApp dele com o contexto do lead.
+  let seller: HandoffResult | null = null;
+  if (agent) {
+    seller = await handoffToSeller({
+      agent,
+      companyId,
+      contactName: fullTicket?.contact?.name || "",
+      contactNumber: fullTicket?.contact?.number || "",
+      motivo,
+      preference: sellerPreference
+    });
+  }
+
   logger.info(
     `[Agente IA] TRANSFERIDO ticket=${ticketId} -> fila=${
-      targetQueueId || ticket.queueId
-    } (agente desligado). Motivo: ${motivo || "-"}`
+      targetQueueId || "sem fila"
+    } (agente desligado). Vendedor avisado: ${
+      seller?.sellerName || "nenhum"
+    }. Motivo: ${motivo || "-"}`
   );
-  return targetQueueId;
+  return { targetQueueId, seller };
 }
 
 /**
@@ -550,17 +599,25 @@ async function executeTransfer(
     return { content: "Ticket não encontrado para transferir.", isError: true };
   }
 
-  await transferTicketToHuman({
+  const result = await transferTicketToHuman({
     companyId: ctx.companyId,
     ticketId: ctx.ticketId,
     transferQueueId: ctx.transferQueueId || null,
     filaNome: input?.fila ? String(input.fila) : undefined,
-    motivo: input?.motivo
+    motivo: input?.motivo,
+    sellerPreference: input?.vendedor_preferencia
+      ? String(input.vendedor_preferencia)
+      : undefined
   });
 
+  const content = result.seller
+    ? `Lead encaminhado ao vendedor ${result.seller.sellerName}${
+        result.seller.viaPreference ? " (preferência do cliente)" : " (rodízio)"
+      }, que já foi avisado no WhatsApp e vai chamar o cliente. Diga ao cliente, de forma curta e calorosa, que o vendedor ${result.seller.sellerName} vai entrar em contato pelo WhatsApp em instantes, e despeça-se. Não continue o atendimento.`
+    : "Atendimento transferido para a equipe de vendas. Avise o cliente, de forma curta e cordial, que um vendedor vai chamá-lo em instantes, e despeça-se. Não continue o atendimento.";
+
   return {
-    content:
-      "Atendimento transferido para um atendente humano. Você saiu desta conversa — dê uma despedida curta e educada e não responda mais.",
+    content,
     isError: false,
     transferred: true
   };

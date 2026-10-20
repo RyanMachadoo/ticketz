@@ -319,6 +319,16 @@ const messages = {
           campaignTitle: "Título da campanha",
           campaignValidity: "Válido até (opcional)",
           campaignDesc: "Descrição / condição",
+          sellersTitle: "Vendedores (rodízio)",
+          sellersHint:
+            "Os vendedores usam o WhatsApp próprio. Ao transferir, o agente escolhe um (preferência do cliente ou rodízio) e manda o lead com o contexto no WhatsApp dele. Deixe só os ativos; vazio = transfere sem avisar vendedor.",
+          addSeller: "Adicionar vendedor",
+          sellerActive: "Ativo",
+          sellerName: "Nome do vendedor",
+          sellerNumber: "WhatsApp (só números, com DDI+DDD)",
+          sellerNumberHint: "Ex.: 5516999998888",
+          sellerAliases: "Apelidos (opcional)",
+          sellerAliasesHint: "Separe por vírgula; ajuda a casar a preferência do cliente.",
           active: "Ativo",
           queues: "Filas atendidas",
           queuesHint:

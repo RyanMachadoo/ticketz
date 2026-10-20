@@ -25,6 +25,30 @@ export interface AIAgentData {
   conversationResetDays?: number;
   campaigns?: any[];
   repeatTransferThreshold?: number;
+  sellers?: any[];
+}
+
+/** Normaliza a lista de vendedores do rodízio vinda da UI. */
+function sanitizeSellers(raw: any): any[] {
+  if (!Array.isArray(raw)) return [];
+  const toAliases = (v: any): string[] =>
+    Array.isArray(v)
+      ? v.map(x => String(x || "").trim()).filter(Boolean)
+      : typeof v === "string"
+      ? v
+          .split(/[\n,;]+/)
+          .map(s => s.trim())
+          .filter(Boolean)
+      : [];
+  return raw
+    .map(s => ({
+      nome: String(s?.nome || "").trim().slice(0, 80),
+      numero: String(s?.numero || "").replace(/\D/g, "").slice(0, 15),
+      aliases: toAliases(s?.aliases).slice(0, 8),
+      ativo: s?.ativo === undefined ? true : !!s.ativo
+    }))
+    .filter(s => s.nome && s.numero)
+    .slice(0, 50);
 }
 
 /** Normaliza a lista de campanhas vinda da UI. */
@@ -183,7 +207,9 @@ export async function createAgent(
     repeatTransferThreshold:
       data.repeatTransferThreshold !== undefined
         ? Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0))
-        : 3
+        : 3,
+    sellers: sanitizeSellers(data.sellers),
+    sellerRotationIndex: 0
   } as any);
 
   await syncQueues(agent, data.queueIds, companyId);
@@ -246,7 +272,9 @@ export async function updateAgent(
     repeatTransferThreshold:
       data.repeatTransferThreshold === undefined
         ? agent.repeatTransferThreshold
-        : Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0))
+        : Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0)),
+    sellers:
+      data.sellers === undefined ? agent.sellers : sanitizeSellers(data.sellers)
   };
 
   // Só troca a chave quando vier uma nova não vazia (mantém a atual caso contrário).

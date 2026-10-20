@@ -102,6 +102,7 @@ const defaultForm = {
   conversationResetDays: 3,
   repeatTransferThreshold: 3,
   campaigns: [],
+  sellers: [],
   isActive: true,
   systemPrompt: "",
   tools: [],
@@ -165,6 +166,14 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
                 ? 3
                 : Number(data.repeatTransferThreshold),
             campaigns: Array.isArray(data.campaigns) ? data.campaigns : [],
+            sellers: Array.isArray(data.sellers)
+              ? data.sellers.map(s => ({
+                  ...s,
+                  aliases: Array.isArray(s.aliases)
+                    ? s.aliases.join(", ")
+                    : s.aliases || ""
+                }))
+              : [],
             isActive: data.isActive !== undefined ? data.isActive : true,
             systemPrompt: data.systemPrompt || "",
             tools: Array.isArray(data.tools) ? data.tools : [],
@@ -226,6 +235,28 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
     setForm(f => ({
       ...f,
       campaigns: f.campaigns.filter((_, i) => i !== idx)
+    }));
+
+  // ---- sellers helpers ----
+  const addSeller = () =>
+    setForm(f => ({
+      ...f,
+      sellers: [
+        ...f.sellers,
+        { nome: "", numero: "", aliases: "", ativo: true }
+      ]
+    }));
+
+  const updateSeller = (idx, patch) =>
+    setForm(f => ({
+      ...f,
+      sellers: f.sellers.map((s, i) => (i === idx ? { ...s, ...patch } : s))
+    }));
+
+  const removeSeller = idx =>
+    setForm(f => ({
+      ...f,
+      sellers: f.sellers.filter((_, i) => i !== idx)
     }));
 
   // ---- tools helpers ----
@@ -294,6 +325,7 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         conversationResetDays: Number(form.conversationResetDays) || 0,
         repeatTransferThreshold: Number(form.repeatTransferThreshold) || 0,
         campaigns: form.campaigns,
+        sellers: form.sellers,
         isActive: form.isActive,
         systemPrompt: form.systemPrompt,
         tools: form.tools,
@@ -827,6 +859,86 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
           onClick={addCampaign}
         >
           {i18n.t("aiAgents.modal.addCampaign")}
+        </Button>
+
+        <Divider className={classes.section} />
+        <Typography variant="subtitle1">
+          {i18n.t("aiAgents.modal.sellersTitle")}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          className={classes.hint}
+        >
+          {i18n.t("aiAgents.modal.sellersHint")}
+        </Typography>
+
+        {form.sellers.map((s, idx) => (
+          <Paper variant="outlined" className={classes.toolCard} key={idx}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={s.ativo !== false}
+                    onChange={e =>
+                      updateSeller(idx, { ativo: e.target.checked })
+                    }
+                    color="primary"
+                  />
+                }
+                label={i18n.t("aiAgents.modal.sellerActive")}
+              />
+              <IconButton size="small" onClick={() => removeSeller(idx)}>
+                <DeleteOutline fontSize="small" />
+              </IconButton>
+            </div>
+            <Grid container spacing={1}>
+              <Grid item xs={12} sm={5}>
+                <TextField
+                  label={i18n.t("aiAgents.modal.sellerName")}
+                  value={s.nome || ""}
+                  onChange={e => updateSeller(idx, { nome: e.target.value })}
+                  fullWidth
+                  margin="dense"
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField
+                  label={i18n.t("aiAgents.modal.sellerNumber")}
+                  helperText={i18n.t("aiAgents.modal.sellerNumberHint")}
+                  value={s.numero || ""}
+                  onChange={e => updateSeller(idx, { numero: e.target.value })}
+                  fullWidth
+                  margin="dense"
+                  placeholder="5516999998888"
+                />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField
+                  label={i18n.t("aiAgents.modal.sellerAliases")}
+                  helperText={i18n.t("aiAgents.modal.sellerAliasesHint")}
+                  value={s.aliases || ""}
+                  onChange={e => updateSeller(idx, { aliases: e.target.value })}
+                  fullWidth
+                  margin="dense"
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+        ))}
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<AddCircleOutline />}
+          onClick={addSeller}
+        >
+          {i18n.t("aiAgents.modal.addSeller")}
         </Button>
 
         <Divider className={classes.section} />
