@@ -103,6 +103,8 @@ const defaultForm = {
   repeatTransferThreshold: 3,
   campaigns: [],
   sellers: [],
+  sellerTemplateName: "",
+  sellerTemplateLang: "pt_BR",
   isActive: true,
   systemPrompt: "",
   tools: [],
@@ -121,6 +123,7 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
   const classes = useStyles();
   const [form, setForm] = useState(defaultForm);
   const [queues, setQueues] = useState([]);
+  const [connections, setConnections] = useState([]);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -135,6 +138,13 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         setQueues(Array.isArray(queuesData) ? queuesData : []);
       } catch (err) {
         toastError(err);
+      }
+
+      try {
+        const { data: waData } = await api.get("/whatsapp");
+        setConnections(Array.isArray(waData) ? waData : []);
+      } catch (err) {
+        // lista de conexões é opcional (só para o seletor de aviso ao vendedor)
       }
 
       if (agentId) {
@@ -174,6 +184,8 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
                     : s.aliases || ""
                 }))
               : [],
+            sellerTemplateName: data.sellerTemplateName || "",
+            sellerTemplateLang: data.sellerTemplateLang || "pt_BR",
             isActive: data.isActive !== undefined ? data.isActive : true,
             systemPrompt: data.systemPrompt || "",
             tools: Array.isArray(data.tools) ? data.tools : [],
@@ -326,6 +338,10 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         repeatTransferThreshold: Number(form.repeatTransferThreshold) || 0,
         campaigns: form.campaigns,
         sellers: form.sellers,
+        sellerTemplateName: form.sellerTemplateName
+          ? form.sellerTemplateName.trim()
+          : null,
+        sellerTemplateLang: form.sellerTemplateLang || "pt_BR",
         isActive: form.isActive,
         systemPrompt: form.systemPrompt,
         tools: form.tools,
@@ -940,6 +956,58 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         >
           {i18n.t("aiAgents.modal.addSeller")}
         </Button>
+
+        <Grid container spacing={1} style={{ marginTop: 8 }}>
+          <Grid item xs={12}>
+            <FormControl fullWidth margin="dense">
+              <InputLabel>
+                {i18n.t("aiAgents.modal.sellerNotifyConnection")}
+              </InputLabel>
+              <Select
+                value={form.sellerNotifyWhatsappId || ""}
+                onChange={e =>
+                  setField("sellerNotifyWhatsappId", e.target.value)
+                }
+              >
+                <MenuItem value="">
+                  <em>{i18n.t("aiAgents.modal.sellerNotifyConnectionDefault")}</em>
+                </MenuItem>
+                {connections.map(c => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name}
+                    {c.channel ? ` — ${c.channel}` : ""}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("aiAgents.modal.sellerNotifyConnectionHint")}
+            </Typography>
+          </Grid>
+        </Grid>
+
+        <Grid container spacing={1} style={{ marginTop: 8 }}>
+          <Grid item xs={12} sm={8}>
+            <TextField
+              label={i18n.t("aiAgents.modal.sellerTemplateName")}
+              helperText={i18n.t("aiAgents.modal.sellerTemplateNameHint")}
+              value={form.sellerTemplateName}
+              onChange={e => setField("sellerTemplateName", e.target.value)}
+              fullWidth
+              margin="dense"
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label={i18n.t("aiAgents.modal.sellerTemplateLang")}
+              value={form.sellerTemplateLang}
+              onChange={e => setField("sellerTemplateLang", e.target.value)}
+              fullWidth
+              margin="dense"
+              placeholder="pt_BR"
+            />
+          </Grid>
+        </Grid>
 
         <Divider className={classes.section} />
         <Typography variant="subtitle1">

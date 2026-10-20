@@ -573,7 +573,8 @@ export async function transferTicketToHuman(params: {
       contactName: fullTicket?.contact?.name || "",
       contactNumber: fullTicket?.contact?.number || "",
       motivo,
-      preference: sellerPreference
+      preference: sellerPreference,
+      whatsappId: ticket.whatsappId || fullTicket?.whatsappId
     });
   }
 

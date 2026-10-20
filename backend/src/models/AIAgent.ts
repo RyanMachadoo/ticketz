@@ -129,6 +129,35 @@ class AIAgent extends Model<AIAgent> {
   @Column
   repeatTransferThreshold: number;
 
+  // Vendedores para o rodízio de leads. Ao transferir, o agente avisa um
+  // vendedor no WhatsApp DELE (número próprio) com o contexto do lead, em vez
+  // de o vendedor pegar o ticket na plataforma. Formato:
+  // [{ nome, numero, aliases?: string[], ativo }]. Ver AgentSellerService.
+  @Default([])
+  @Column(DataType.JSONB)
+  sellers: any[];
+
+  // Ponteiro do rodízio (round-robin) entre os vendedores ativos.
+  @Default(0)
+  @Column
+  sellerRotationIndex: number;
+
+  // Conexão usada para AVISAR os vendedores. O ideal é um número secundário
+  // conectado via BAILEYS (dedicado a avisos internos): sem janela de 24h, sem
+  // template, sem custo Meta. Se vazio, usa a conexão do ticket (ex.: EvoHub).
+  @Column
+  sellerNotifyWhatsappId: number;
+
+  // Aviso ao vendedor no canal OFICIAL (EvoHub): fora da janela de 24h, a Meta
+  // exige template aprovado (HSM). Só é usado quando o aviso sai por uma
+  // conexão oficial. Com Baileys, isto é ignorado (manda texto livre direto).
+  @Column(DataType.STRING)
+  sellerTemplateName: string;
+
+  @Default("pt_BR")
+  @Column(DataType.STRING)
+  sellerTemplateLang: string;
+
   @HasMany(() => Queue)
   queues: Queue[];
 

@@ -328,6 +328,14 @@ const messages = {
           sellerNumberHint: "Ej.: 5516999998888",
           sellerAliases: "Alias (opcional)",
           sellerAliasesHint: "Separe por comas; ayuda a coincidir con la preferencia del cliente.",
+          sellerNotifyConnection: "Conexión para avisar vendedores",
+          sellerNotifyConnectionDefault: "Predeterminada (conexión del ticket)",
+          sellerNotifyConnectionHint:
+            "Recomendado: un número secundario conectado por Baileys, solo para avisos internos (sin ventana de 24h, sin plantilla, sin costo Meta). Predeterminado usa la conexión del ticket.",
+          sellerTemplateName: "Plantilla para aviso (canal oficial)",
+          sellerTemplateNameHint:
+            "Nombre de una plantilla aprobada en Meta (body con una variable {{1}}). Obligatoria en el canal oficial para avisar al vendedor fuera de la ventana de 24h. Vacío = intenta texto libre.",
+          sellerTemplateLang: "Idioma de la plantilla",
           active: "Activo",
           queues: "Colas atendidas",
           queuesHint:

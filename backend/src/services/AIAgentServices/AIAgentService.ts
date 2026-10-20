@@ -26,6 +26,9 @@ export interface AIAgentData {
   campaigns?: any[];
   repeatTransferThreshold?: number;
   sellers?: any[];
+  sellerNotifyWhatsappId?: number | null;
+  sellerTemplateName?: string | null;
+  sellerTemplateLang?: string;
 }
 
 /** Normaliza a lista de vendedores do rodízio vinda da UI. */
@@ -209,7 +212,19 @@ export async function createAgent(
         ? Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0))
         : 3,
     sellers: sanitizeSellers(data.sellers),
-    sellerRotationIndex: 0
+    sellerRotationIndex: 0,
+    sellerNotifyWhatsappId:
+      data.sellerNotifyWhatsappId === undefined ||
+      data.sellerNotifyWhatsappId === null ||
+      `${data.sellerNotifyWhatsappId}` === ""
+        ? null
+        : Number(data.sellerNotifyWhatsappId),
+    sellerTemplateName: data.sellerTemplateName
+      ? String(data.sellerTemplateName).trim()
+      : null,
+    sellerTemplateLang: data.sellerTemplateLang
+      ? String(data.sellerTemplateLang).trim()
+      : "pt_BR"
   } as any);
 
   await syncQueues(agent, data.queueIds, companyId);
@@ -274,7 +289,24 @@ export async function updateAgent(
         ? agent.repeatTransferThreshold
         : Math.max(0, Math.floor(Number(data.repeatTransferThreshold) || 0)),
     sellers:
-      data.sellers === undefined ? agent.sellers : sanitizeSellers(data.sellers)
+      data.sellers === undefined ? agent.sellers : sanitizeSellers(data.sellers),
+    sellerNotifyWhatsappId:
+      data.sellerNotifyWhatsappId === undefined
+        ? agent.sellerNotifyWhatsappId
+        : data.sellerNotifyWhatsappId === null ||
+          `${data.sellerNotifyWhatsappId}` === ""
+        ? null
+        : Number(data.sellerNotifyWhatsappId),
+    sellerTemplateName:
+      data.sellerTemplateName === undefined
+        ? agent.sellerTemplateName
+        : data.sellerTemplateName
+        ? String(data.sellerTemplateName).trim()
+        : null,
+    sellerTemplateLang:
+      data.sellerTemplateLang === undefined
+        ? agent.sellerTemplateLang
+        : String(data.sellerTemplateLang || "pt_BR").trim() || "pt_BR"
   };
 
   // Só troca a chave quando vier uma nova não vazia (mantém a atual caso contrário).

@@ -330,6 +330,14 @@ const messages = {
           sellerNumberHint: "e.g. 5516999998888",
           sellerAliases: "Aliases (optional)",
           sellerAliasesHint: "Comma-separated; helps match the customer's preference.",
+          sellerNotifyConnection: "Connection to notify sellers",
+          sellerNotifyConnectionDefault: "Default (ticket's connection)",
+          sellerNotifyConnectionHint:
+            "Recommended: a secondary number connected via Baileys, just for internal notices (no 24h window, no template, no Meta cost). Default uses the ticket's connection.",
+          sellerTemplateName: "Template for notice (official channel)",
+          sellerTemplateNameHint:
+            "Name of a Meta-approved template (body with one variable {{1}}). Required on the official channel to notify the seller outside the 24h window. Empty = tries free text.",
+          sellerTemplateLang: "Template language",
           active: "Active",
           queues: "Served queues",
           queuesHint:

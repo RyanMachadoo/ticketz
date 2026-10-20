@@ -329,6 +329,14 @@ const messages = {
           sellerNumberHint: "Ex.: 5516999998888",
           sellerAliases: "Apelidos (opcional)",
           sellerAliasesHint: "Separe por vírgula; ajuda a casar a preferência do cliente.",
+          sellerNotifyConnection: "Conexão para avisar vendedores",
+          sellerNotifyConnectionDefault: "Padrão (conexão do ticket)",
+          sellerNotifyConnectionHint:
+            "Recomendado: um número secundário conectado via Baileys, só para avisos internos (sem janela de 24h, sem template, sem custo Meta). No padrão, usa a conexão do ticket.",
+          sellerTemplateName: "Template p/ aviso (canal oficial)",
+          sellerTemplateNameHint:
+            "Nome de um template aprovado na Meta (body com 1 variável {{1}}). Obrigatório no canal oficial p/ avisar o vendedor fora da janela de 24h. Vazio = tenta texto livre.",
+          sellerTemplateLang: "Idioma do template",
           active: "Ativo",
           queues: "Filas atendidas",
           queuesHint:
