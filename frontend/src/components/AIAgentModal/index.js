@@ -103,6 +103,7 @@ const defaultForm = {
   repeatTransferThreshold: 3,
   campaigns: [],
   sellers: [],
+  sellerNotifyWhatsappId: "",
   sellerTemplateName: "",
   sellerTemplateLang: "pt_BR",
   isActive: true,
@@ -184,6 +185,11 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
                     : s.aliases || ""
                 }))
               : [],
+            sellerNotifyWhatsappId:
+              data.sellerNotifyWhatsappId === null ||
+              data.sellerNotifyWhatsappId === undefined
+                ? ""
+                : data.sellerNotifyWhatsappId,
             sellerTemplateName: data.sellerTemplateName || "",
             sellerTemplateLang: data.sellerTemplateLang || "pt_BR",
             isActive: data.isActive !== undefined ? data.isActive : true,
@@ -338,6 +344,12 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
         repeatTransferThreshold: Number(form.repeatTransferThreshold) || 0,
         campaigns: form.campaigns,
         sellers: form.sellers,
+        sellerNotifyWhatsappId:
+          form.sellerNotifyWhatsappId === "" ||
+          form.sellerNotifyWhatsappId === null ||
+          form.sellerNotifyWhatsappId === undefined
+            ? null
+            : Number(form.sellerNotifyWhatsappId),
         sellerTemplateName: form.sellerTemplateName
           ? form.sellerTemplateName.trim()
           : null,

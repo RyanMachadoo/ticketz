@@ -79,6 +79,7 @@ interface ConversationBuild {
   messages: AnthropicMessage[];
   resetApplied: boolean; // histórico foi cortado por intervalo longo
   gapDays: number; // dias desde o último contato (quando houve corte)
+  freshStartApplied: boolean; // histórico cortado por reativação (pós-transferência)
 }
 
 const stripAccents = (s: string): string =>
@@ -182,11 +183,20 @@ function detectStuck(
  * (resetDays, ex.: 3 dias), o histórico é cortado no ponto de retomada para o
  * agente recomeçar o assunto do zero. As PREFERÊNCIAS não se perdem — elas vêm
  * da memória de longo prazo (por contato), não do histórico cru.
+ *
+ * "Recomeço por reativação" (freshStart): quando o ticket volta para a fila da
+ * IA depois de ter sido transferido para um humano, o histórico cru ainda
+ * contém a despedida/transferência do próprio agente ("já vou te passar para um
+ * vendedor..."). Se reenviarmos isso, o modelo "acha" que já saiu da conversa e
+ * responde VAZIO. Então cortamos para a última fala do cliente em diante (tudo
+ * após a última mensagem fromMe), dando um começo limpo — a memória de longo
+ * prazo continua provendo o contexto do cliente.
  */
 async function buildConversation(
   ticketId: number,
   companyId: number,
-  resetDays: number
+  resetDays: number,
+  freshStart = false
 ): Promise<ConversationBuild> {
   const messages = await Message.findAll({
     where: { ticketId, companyId },
@@ -216,6 +226,26 @@ async function buildConversation(
     }
   }
 
+  // Reativação: corta para depois da última mensagem do agente/atendente
+  // (fromMe), mantendo só o bloco final do cliente. Prevalece sobre o corte por
+  // tempo (o começo limpo é o ponto mais recente dos dois).
+  let freshStartApplied = false;
+  if (freshStart && messages.length) {
+    let lastFromMeIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].fromMe) {
+        lastFromMeIdx = i;
+        break;
+      }
+    }
+    // Só corta se houver mensagem do cliente DEPOIS da última fala nossa —
+    // caso contrário não há nada novo para responder e mantemos o histórico.
+    if (lastFromMeIdx >= 0 && lastFromMeIdx < messages.length - 1) {
+      if (lastFromMeIdx + 1 > startIdx) startIdx = lastFromMeIdx + 1;
+      freshStartApplied = true;
+    }
+  }
+
   const slice = messages.slice(startIdx);
   const turns: { role: "user" | "assistant"; text: string }[] = [];
   slice.forEach(m => {
@@ -241,7 +271,8 @@ async function buildConversation(
   return {
     messages: turns.map(t => ({ role: t.role, content: t.text })),
     resetApplied,
-    gapDays
+    gapDays,
+    freshStartApplied
   };
 }
 
@@ -284,11 +315,14 @@ export async function handleAgentReply(
 
     // Reativação: se o ticket voltou para uma fila COM IA depois de ter sido
     // transferido (useAgent=false), religa o agente — estar numa fila de IA é o
-    // sinal de que a IA deve atender de novo.
-    if (ticket.useAgent === false) {
+    // sinal de que a IA deve atender de novo. Guardamos o flag para começar a
+    // conversa do zero (ver buildConversation/freshStart): sem isso, o histórico
+    // ainda traria a despedida/transferência e o modelo responderia vazio.
+    const reactivated = ticket.useAgent === false;
+    if (reactivated) {
       await ticket.update({ useAgent: true });
       logger.info(
-        `[Agente IA] ticket=${ticketId} voltou para fila com IA — agente reativado.`
+        `[Agente IA] ticket=${ticketId} voltou para fila com IA — agente reativado (recomeço limpo da conversa).`
       );
     }
 
@@ -335,7 +369,12 @@ export async function handleAgentReply(
       agent.conversationResetDays === null
         ? 0
         : Number(agent.conversationResetDays);
-    const convo = await buildConversation(ticketId, companyId, resetDays);
+    const convo = await buildConversation(
+      ticketId,
+      companyId,
+      resetDays,
+      reactivated
+    );
     const messages = convo.messages;
     if (!messages.length) return;
 
@@ -581,10 +620,23 @@ export async function handleAgentReply(
       }
     }
 
+    // Último recurso: se, mesmo após as tentativas acima, ainda não há texto e
+    // não transferimos, o cliente NÃO pode ficar no vácuo. Manda uma saudação
+    // curta e segura para reabrir a conversa (acontece sobretudo logo após uma
+    // reativação, quando o modelo ainda tenta "encerrar" o assunto antigo).
+    if (!finalText && !transferred) {
+      finalText = reactivated
+        ? "Oi! Voltei por aqui 😊 Em que posso te ajudar com os nossos veículos?"
+        : "Oi! Como posso te ajudar? 😊";
+      logger.info(
+        `[Agente IA] texto final vazio — usando resposta de segurança (ticket=${ticketId}, reativado=${reactivated}).`
+      );
+    }
+
     if (finalText) {
       await SendWhatsAppMessage({ body: finalText, ticket: fullTicket });
       logger.info(
-        `[Agente IA] resposta enviada (ticket=${ticketId}, agente=${agent.id}, transferido=${transferred}).`
+        `[Agente IA] resposta enviada (ticket=${ticketId}, agente=${agent.id}, transferido=${transferred}, freshStart=${convo.freshStartApplied}).`
       );
     } else {
       logger.info(
