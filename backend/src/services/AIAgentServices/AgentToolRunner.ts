@@ -17,7 +17,11 @@ import {
   EstoqueVeiculo
 } from "../EstoqueServices/EstoqueService";
 import AIAgent from "../../models/AIAgent";
-import { handoffToSeller, HandoffResult } from "./AgentSellerService";
+import {
+  handoffToSeller,
+  HandoffResult,
+  resolveSellerAgent
+} from "./AgentSellerService";
 
 export const HUMAN_QUEUE_NAME = "Atendimento Humano";
 
@@ -513,6 +517,13 @@ export async function transferTicketToHuman(params: {
     }
   } catch (e) {
     // best-effort
+  }
+
+  // Fallback: se o handoff não partiu de uma fila de IA (ex.: lead de campanha
+  // que tocou num botão, sem agente vinculado), ainda assim resolve um agente
+  // com rodízio de vendedores configurado para a empresa.
+  if (!agent) {
+    agent = await resolveSellerAgent(companyId);
   }
 
   let targetQueueId: number | null = null;

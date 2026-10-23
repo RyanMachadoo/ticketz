@@ -42,6 +42,30 @@ function activeSellers(agent: AIAgent): SellerConfig[] {
     .filter(s => s.ativo && s.numero && s.nome);
 }
 
+/**
+ * Descobre um agente com rodízio de vendedores configurado para a empresa —
+ * usado quando o handoff NÃO parte de uma fila de IA (ex.: lead de campanha que
+ * tocou num botão e não tem agente vinculado). Preferência: um agente ativo com
+ * vendedores; senão qualquer agente ativo da empresa.
+ */
+export async function resolveSellerAgent(
+  companyId: number
+): Promise<AIAgent | null> {
+  try {
+    const agents = await AIAgent.findAll({
+      where: { companyId, isActive: true },
+      order: [["id", "ASC"]]
+    });
+    const withSellers = agents.find(a => activeSellers(a).length > 0);
+    return withSellers || agents[0] || null;
+  } catch (err: any) {
+    logger.error(
+      `[Agente IA][rodízio] falha ao resolver agente de vendedores: ${err?.message}`
+    );
+    return null;
+  }
+}
+
 /** Casa o nome de preferência do cliente com um vendedor (nome ou alias). */
 function matchPreference(
   sellers: SellerConfig[],

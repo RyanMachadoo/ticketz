@@ -7,6 +7,7 @@ import FindOrCreateTicketService from "../services/TicketServices/FindOrCreateTi
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
 import { saveReferral } from "../services/CtwaServices/CtwaService";
 import { dispatchWebhookEvent } from "../services/WebhookServices/DispatchWebhook";
+import { handleCampaignButtonLead } from "../services/CampaignService/HandleCampaignButtonLead";
 
 /**
  * Processa em background os eventos recebidos do EvoHub (Cloud API oficial).
@@ -146,6 +147,21 @@ evoHubInboundQueue.process(async job => {
         },
         companyId
       });
+
+      // Lead de CAMPANHA por botão: se o cliente tocou num botão de resposta
+      // rápida (template de campanha) e o texto está nos gatilhos da empresa,
+      // manda o lead direto para o rodízio de vendedores (opt-in). Best-effort:
+      // não interrompe o restante do processamento da mensagem.
+      const isButtonReply =
+        msg.type === "button" ||
+        (msg.type === "interactive" && !!msg.interactive?.button_reply);
+      if (isButtonReply && body) {
+        await handleCampaignButtonLead({
+          companyId,
+          ticketId: ticket.id,
+          buttonText: body
+        });
+      }
 
       // Atribuição Click-to-WhatsApp: se a mensagem veio de um clique em anúncio,
       // a Meta manda um objeto `referral`. Salva de qual anúncio veio (1 por

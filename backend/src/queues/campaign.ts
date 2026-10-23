@@ -25,6 +25,12 @@ import { Session } from "../libs/wbot";
 import { getJidOf } from "../services/WbotServices/getJidOf";
 import { clearRepeatableJobsFromQueues } from "./repeatableJobs";
 import * as EvoHubProvider from "../services/EvoHubServices/EvoHubProvider";
+import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
+import FindOrCreateTicketService from "../services/TicketServices/FindOrCreateTicketService";
+import CreateMessageService from "../services/MessageServices/CreateMessageService";
+
+// Canal oficial (EvoHub / Meta Cloud API) — mesmo valor usado no inbound.
+const EVOHUB_CHANNEL = "whatsapp_oficial";
 
 const connection = process.env.REDIS_URI || "";
 export const campaignQueue = new Queue("CampaignQueue", connection);
@@ -497,6 +503,139 @@ async function getOfficialHeaderMediaId(
   return mediaId;
 }
 
+// Cache da DEFINIÇÃO do template (componentes vindos da Meta) por campanha —
+// o template raramente muda; as variáveis é que mudam por contato.
+const officialTemplateCache = new Map<string, any>();
+
+/** Busca na Meta (via EvoHub) a definição do template usado pela campanha. */
+async function getCampaignTemplate(campaign: Campaign): Promise<any | null> {
+  const key = String(campaign.id);
+  if (officialTemplateCache.has(key)) return officialTemplateCache.get(key);
+  try {
+    const all = await EvoHubProvider.getTemplates(campaign.whatsapp);
+    const lang = campaign.templateLanguage || "pt_BR";
+    const tpl =
+      all.find(
+        (t: any) => t.name === campaign.templateName && t.language === lang
+      ) ||
+      all.find((t: any) => t.name === campaign.templateName) ||
+      null;
+    officialTemplateCache.set(key, tpl);
+    return tpl;
+  } catch (err: any) {
+    logger.warn(
+      `[Campanha oficial] não consegui buscar o template '${campaign.templateName}' na Meta: ${err?.message}`
+    );
+    officialTemplateCache.set(key, null);
+    return null;
+  }
+}
+
+/** Substitui {{1}}, {{2}}... pelos parâmetros da campanha (posicional). */
+function fillPlaceholders(text: string, params: string[]): string {
+  return String(text || "").replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => {
+    const i = Number(n) - 1;
+    return params[i] !== undefined ? params[i] : `{{${n}}}`;
+  });
+}
+
+/**
+ * Reconstrói o TEXTO REAL que o cliente recebeu, a partir dos componentes do
+ * template (cabeçalho, corpo, rodapé e botões) com as variáveis preenchidas.
+ * É o que vai para o histórico da conversa.
+ */
+function renderTemplateText(tpl: any, params: string[]): string {
+  if (!tpl || !isArray(tpl.components)) return "";
+  const parts: string[] = [];
+  for (const c of tpl.components) {
+    const type = String(c?.type || "").toUpperCase();
+    if (type === "HEADER") {
+      const fmt = String(c?.format || "TEXT").toUpperCase();
+      if (fmt === "TEXT" && c.text) parts.push(fillPlaceholders(c.text, params));
+      else if (fmt === "IMAGE") parts.push("🖼️ [imagem]");
+      else if (fmt === "VIDEO") parts.push("🎞️ [vídeo]");
+      else if (fmt === "DOCUMENT") parts.push("📎 [documento]");
+    } else if (type === "BODY") {
+      parts.push(fillPlaceholders(c.text, params));
+    } else if (type === "FOOTER") {
+      if (c.text) parts.push(String(c.text));
+    } else if (type === "BUTTONS") {
+      const btns = (c.buttons || [])
+        .map((b: any) => `[ ${b?.text || ""} ]`)
+        .filter((s: string) => s !== "[  ]")
+        .join("   ");
+      if (btns) parts.push(btns);
+    }
+  }
+  return parts.filter(Boolean).join("\n\n").trim();
+}
+
+/**
+ * Espelha a mensagem de campanha enviada (canal oficial) na conversa do
+ * contato, como mensagem fromMe — assim o disparo APARECE no histórico mesmo
+ * antes de o cliente responder (antes, a conversa só "nascia" quando o cliente
+ * respondia). "Só histórico": se o ticket for criado agora, ele nasce FECHADO
+ * (não vira atendimento ativo na fila); quando o cliente responder, o webhook
+ * de entrada reabre normalmente e o disparo já está no histórico.
+ *
+ * O corpo gravado é o TEXTO REAL do template (buscado na Meta e com as
+ * variáveis preenchidas). Se a busca falhar, cai para campaign.message1 e, por
+ * último, para um resumo com o nome do template e os parâmetros.
+ */
+async function persistOfficialCampaignCopy(
+  campaign: Campaign,
+  campaignShipping: CampaignShipping,
+  body: string,
+  wamid?: string | null
+) {
+  try {
+    const { companyId } = campaign;
+    const number = String(campaignShipping.number).replace(/\D/g, "");
+    if (!number) return;
+
+    const contact = await CreateOrUpdateContactService({
+      name: campaignShipping.contact?.name || number,
+      number,
+      isGroup: false,
+      companyId,
+      channel: EVOHUB_CHANNEL
+    });
+
+    const { ticket, justCreated } = await FindOrCreateTicketService(
+      contact,
+      campaign.whatsappId,
+      companyId,
+      { incrementUnread: false }
+    );
+
+    await CreateMessageService({
+      messageData: {
+        id: wamid || `campaign-${campaign.id}-${campaignShipping.id}`,
+        ticketId: ticket.id,
+        contactId: contact.id,
+        body: body || `[Campanha enviada: ${campaign.templateName}]`,
+        fromMe: true,
+        read: true,
+        mediaType: "chat",
+        ack: 1,
+        channel: EVOHUB_CHANNEL
+      },
+      companyId
+    });
+
+    // "Só histórico": não transformar o disparo num atendimento ativo. Se o
+    // ticket foi criado agora por nós, fecha de volta. Se já existia um ticket
+    // aberto/pendente (cliente em atendimento), não mexe no status.
+    if (justCreated) {
+      await ticket.update({ status: "closed", unreadMessages: 0 });
+    }
+  } catch (err: any) {
+    logger.warn(
+      `[Campanha oficial] não consegui espelhar a cópia na conversa (campanha=${campaign.id}, shipping=${campaignShipping.id}): ${err?.message}`
+    );
+  }
+}
+
 /**
  * Disparo de campanha para conexão OFICIAL (EvoHub / Cloud API).
  * Envia um template aprovado da Meta:
@@ -565,14 +704,16 @@ async function dispatchOfficialCampaign(
 
   const language = campaign.templateLanguage || "pt_BR";
 
+  let wamid: string | null = null;
   try {
-    await EvoHubProvider.sendTemplate(
+    const result = await EvoHubProvider.sendTemplate(
       campaign.whatsapp,
       to,
       campaign.templateName,
       language,
       components.length ? components : undefined
     );
+    wamid = result?.wamid || null;
   } catch (err: any) {
     // Loga o motivo real vindo da Meta/EvoHub (ex.: header de imagem ausente,
     // template não aprovado, número inválido) para facilitar o diagnóstico.
@@ -583,6 +724,32 @@ async function dispatchOfficialCampaign(
     );
     throw err;
   }
+
+  // Espelha a mensagem enviada na conversa do contato (fromMe), para o disparo
+  // aparecer no histórico mesmo antes de o cliente responder. Usa o TEXTO REAL
+  // do template (buscado na Meta, variáveis preenchidas); se falhar, cai para
+  // o preview em campaign.message1 e, por último, para um resumo.
+  const tpl = await getCampaignTemplate(campaign);
+  let historyBody = renderTemplateText(tpl, params);
+  if (!historyBody) {
+    const previewBody = getProcessedMessage(
+      String(campaign.message1 || ""),
+      settings.variables,
+      contact
+    );
+    historyBody =
+      previewBody && previewBody.trim()
+        ? previewBody
+        : `[Campanha enviada: ${campaign.templateName}${
+            params.length ? ` — ${params.join(" | ")}` : ""
+          }]`;
+  }
+  await persistOfficialCampaignCopy(
+    campaign,
+    campaignShipping,
+    historyBody,
+    wamid
+  );
 
   await campaignShipping.update({ deliveredAt: moment() });
 }
