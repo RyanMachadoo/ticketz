@@ -185,7 +185,14 @@ export async function handoffToSeller(params: {
   } = params;
   try {
     const sellers = activeSellers(agent);
-    if (!sellers.length) return null; // rodízio não configurado
+    if (!sellers.length) {
+      logger.warn(
+        `[Agente IA][rodízio] agente ${agent.id} sem vendedores ATIVOS/válidos (sellers brutos=${
+          Array.isArray(agent.sellers) ? agent.sellers.length : 0
+        }). Confira nome e número (só dígitos com DDI/DDD) de cada vendedor.`
+      );
+      return null; // rodízio não configurado
+    }
 
     let seller: SellerConfig | null = null;
     let viaPreference = false;
@@ -221,6 +228,14 @@ export async function handoffToSeller(params: {
     if (notifyId) connection = await Whatsapp.findByPk(notifyId);
     if (!connection && whatsappId) connection = await Whatsapp.findByPk(whatsappId);
     if (!connection) connection = await GetDefaultWhatsApp(companyId);
+
+    logger.info(
+      `[Agente IA][rodízio] enviando aviso ao vendedor ${seller.nome} (${seller.numero}) via conexão id=${
+        connection?.id || "?"
+      } nome="${connection?.name || "?"}" canal=${connection?.channel || "?"} status=${
+        connection?.status || "?"
+      }.`
+    );
 
     const sent = await sendToSeller(connection, seller.numero, body, agent);
     if (!sent) return null;

@@ -132,6 +132,17 @@ evoHubInboundQueue.process(async job => {
 
       const { body, mediaType, mediaUrl } = extractContent(msg);
 
+      // Diagnóstico: o que o EvoHub entregou de fato (tipo/mídia/campos do
+      // botão/contexto). Ajuda a ver se o toque chega como "button",
+      // "interactive" ou "text".
+      logger.info(
+        `[EvoHub] msg recebida ticket=${ticket.id} type=${msg.type} mediaType=${mediaType} bodyLen=${
+          (body || "").length
+        } hasButton=${!!msg.button} hasInteractive=${!!msg.interactive} hasContext=${!!msg.context} contextId=${
+          msg.context?.id || "-"
+        }`
+      );
+
       await CreateMessageService({
         messageData: {
           id: msg.id, // wamid oficial
@@ -148,19 +159,25 @@ evoHubInboundQueue.process(async job => {
         companyId
       });
 
-      // Lead de CAMPANHA por botão: se o cliente tocou num botão de resposta
-      // rápida (template de campanha) e o texto está nos gatilhos da empresa,
-      // manda o lead direto para o rodízio de vendedores (opt-in). Best-effort:
-      // não interrompe o restante do processamento da mensagem.
+      // Lead de CAMPANHA: toque num botão de resposta rápida do template OU um
+      // texto que bate com um gatilho configurado (alguns proxies entregam o
+      // toque do botão como mensagem de texto). Manda o lead direto para o
+      // rodízio de vendedores. Best-effort: não interrompe o processamento.
       const isButtonReply =
         msg.type === "button" ||
         (msg.type === "interactive" && !!msg.interactive?.button_reply);
-      if (isButtonReply && body) {
+      if (body && (isButtonReply || mediaType === "chat")) {
+        logger.info(
+          `[EvoHub] possivel lead de campanha (ticket=${ticket.id}) type=${msg.type} botao=${isButtonReply} texto="${String(
+            body
+          ).slice(0, 60)}"`
+        );
         await handleCampaignButtonLead({
           companyId,
           ticketId: ticket.id,
           buttonText: body,
-          whatsappId: whatsapp.id
+          whatsappId: whatsapp.id,
+          isButton: isButtonReply
         });
       }
 
