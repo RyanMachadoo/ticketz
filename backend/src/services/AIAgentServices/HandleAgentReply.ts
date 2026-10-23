@@ -276,6 +276,32 @@ async function buildConversation(
   };
 }
 
+/**
+ * Corta o histórico para conter SÓ a última fala do cliente (tudo depois do
+ * último turno do assistente). Remove rastros de despedida/transferência
+ * antigos que fazem o modelo "achar" que a conversa já terminou e responder
+ * vazio. As preferências do cliente continuam vindo da memória (no system).
+ * Opera sobre o snapshot LIMPO (content sempre string) — nunca sobre o array
+ * mutado pelo loop de ferramentas (que tem tool_use/tool_result).
+ */
+function trimToLastCustomerBlock(
+  base: AnthropicMessage[]
+): AnthropicMessage[] {
+  let lastAssistant = -1;
+  for (let i = base.length - 1; i >= 0; i -= 1) {
+    if (base[i].role === "assistant") {
+      lastAssistant = i;
+      break;
+    }
+  }
+  const tail = lastAssistant >= 0 ? base.slice(lastAssistant + 1) : base.slice();
+  const onlyUsers = tail.filter(m => m.role === "user");
+  if (onlyUsers.length) return onlyUsers;
+  // fallback: a última mensagem do cliente que houver
+  const lastUser = [...base].reverse().find(m => m.role === "user");
+  return lastUser ? [lastUser] : base.slice(-1);
+}
+
 export async function handleAgentReply(
   ticketId: number,
   companyId: number
@@ -377,6 +403,12 @@ export async function handleAgentReply(
     );
     const messages = convo.messages;
     if (!messages.length) return;
+
+    // Snapshot LIMPO do histórico (antes do loop de ferramentas mexer no array):
+    // só {role, content:string}. Usado como rede de segurança quando o modelo
+    // devolve texto vazio por causa de rastros de despedida/transferência no
+    // histórico — reprocessamos cortando só a última fala do cliente.
+    const baseMessages: AnthropicMessage[] = messages.slice();
 
     // Data/hora atual, para o agente interpretar "ontem", "semana passada" etc.
     const dateLine = `Data e hora atuais: ${nowInTimezone()} (horário de Brasília). Use isto como "hoje" ao interpretar o cliente (ex.: "ontem", "semana passada") — nunca assuma que ainda é a data da última conversa.`;
@@ -595,25 +627,36 @@ export async function handleAgentReply(
       }
     }
 
-    // Rede de segurança: se o loop acabou sem texto (ex.: estourou passos ou o
-    // modelo só chamou ferramentas), faz até 2 chamadas finais SEM ferramentas,
-    // instruindo a responder em texto — assim o cliente nunca fica sem resposta.
+    // Rede de segurança: se o loop acabou sem texto (ex.: estourou passos, o
+    // modelo só chamou ferramentas, ou "achou" que a conversa já terminou por
+    // causa de despedidas antigas no histórico), faz até 2 chamadas finais SEM
+    // ferramentas, instruindo a responder em texto.
+    //  - tryN=0: reusa o histórico completo (caso simples: só faltou o texto).
+    //  - tryN=1: CORTA para a última fala do cliente (remove rastros de
+    //    despedida/transferência que fazem o modelo responder vazio).
     for (let tryN = 0; !finalText && !transferred && tryN < 2; tryN += 1) {
       try {
         steps += 1;
+        const closingMessages =
+          tryN === 0 ? messages : trimToLastCustomerBlock(baseMessages);
         const closing = await callMessages({
           apiKey: agent.apiKey,
           model: agent.model,
           maxTokens: agent.maxTokens,
           temperature: Number(agent.temperature),
           system: `${systemPrompt}\n\nIMPORTANTE: responda AGORA ao cliente em português, de forma curta e útil. NÃO chame ferramentas.`,
-          messages,
+          messages: closingMessages,
           workspaceId: agent.anthropicWorkspaceId || undefined
         });
         inputTokens += Number(closing.raw?.usage?.input_tokens || 0);
         outputTokens += Number(closing.raw?.usage?.output_tokens || 0);
         lastStopReason = closing.stopReason || lastStopReason;
         finalText = extractText(closing.content);
+        if (finalText && tryN > 0) {
+          logger.info(
+            `[Agente IA] texto recuperado após cortar histórico (ticket=${ticketId}).`
+          );
+        }
       } catch (e) {
         describeAnthropicError(e);
         break;
