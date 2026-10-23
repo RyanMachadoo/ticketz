@@ -180,6 +180,14 @@ class Whatsapp extends Model<Whatsapp> {
   // Período (YYYY-MM) em que o admin liberou o envio mesmo acima do limite.
   @Column(DataType.STRING)
   usageOverridePeriod: string;
+
+  // ===== Rodízio de vendedores (por conexão) =====
+  // Agente de IA cuja configuração de rodízio (lista de vendedores + conexão de
+  // aviso) esta conexão usa para o handoff (ex.: lead de campanha por botão),
+  // mesmo quando o ticket não está numa fila com IA. null = resolve o 1º agente
+  // com vendedores da empresa.
+  @Column(DataType.INTEGER)
+  rodizioAgentId: number;
 }
 
 export default Whatsapp;

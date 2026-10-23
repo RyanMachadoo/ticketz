@@ -26,6 +26,8 @@ export interface WhatsappData {
   evohubToken?: string;
   evohubPhoneNumberId?: string;
   evohubWabaId?: string;
+  // Rodízio de vendedores por conexão (aponta para um agente de IA).
+  rodizioAgentId?: number | null;
 }
 
 interface Request {
@@ -66,7 +68,8 @@ const UpdateWhatsAppService = async ({
     evohubBaseUrl,
     evohubToken,
     evohubPhoneNumberId,
-    evohubWabaId
+    evohubWabaId,
+    rodizioAgentId
   } = whatsappData;
 
   try {
@@ -118,7 +121,9 @@ const UpdateWhatsAppService = async ({
     evohubBaseUrl,
     evohubToken,
     evohubPhoneNumberId,
-    evohubWabaId
+    evohubWabaId,
+    // Rodízio por conexão: normaliza "" / 0 para null.
+    rodizioAgentId: rodizioAgentId ? Number(rodizioAgentId) : null
   });
 
   if (queueIds) {

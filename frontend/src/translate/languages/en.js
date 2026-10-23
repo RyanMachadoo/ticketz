@@ -594,6 +594,10 @@ const messages = {
             "Secret channel token generated in the EvoHub panel.",
           evohubPhoneNumberId: "Phone Number ID",
           evohubWabaId: "WABA ID",
+          rodizioAgent: "Seller round-robin agent",
+          rodizioAgentAuto: "Automatic (first agent with sellers)",
+          rodizioAgentHelper:
+            "Agent whose round-robin config (seller list and notify connection) is used for this connection's handoff — e.g. a campaign button lead.",
           evohubWebhookLabel:
             "Webhook URL (register it in the EvoHub panel):",
           evohubWebhookCopied: "Webhook URL copied.",

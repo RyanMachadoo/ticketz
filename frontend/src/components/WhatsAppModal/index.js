@@ -89,10 +89,14 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     evohubBaseUrl: "https://api.evohub.ai/meta",
     evohubToken: "",
     evohubPhoneNumberId: "",
-    evohubWabaId: ""
+    evohubWabaId: "",
+    // Rodízio de vendedores por conexão: aponta para um agente de IA cuja
+    // config de rodízio (vendedores + conexão de aviso) será usada no handoff.
+    rodizioAgentId: ""
   };
   const [whatsApp, setWhatsApp] = useState(initialState);
   const [selectedQueueIds, setSelectedQueueIds] = useState([]);
+  const [agents, setAgents] = useState([]);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -107,7 +111,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
           evohubBaseUrl: data.evohubBaseUrl || "https://api.evohub.ai/meta",
           evohubToken: data.evohubToken || "",
           evohubPhoneNumberId: data.evohubPhoneNumberId || "",
-          evohubWabaId: data.evohubWabaId || ""
+          evohubWabaId: data.evohubWabaId || "",
+          rodizioAgentId: data.rodizioAgentId ?? ""
         }));
 
         const whatsQueueIds = data.queues?.map(queue => queue.id);
@@ -118,6 +123,19 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     };
     fetchSession();
   }, [whatsAppId]);
+
+  // Lista de agentes de IA (para o select "Agente do rodízio").
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const { data } = await api.get("/ai-agents");
+        setAgents(Array.isArray(data) ? data : data?.records || []);
+      } catch (err) {
+        // best-effort: sem agentes, o select só mostra "Automático".
+      }
+    };
+    fetchAgents();
+  }, []);
 
   const handleSaveWhatsApp = async values => {
     const whatsappData = { ...values, queueIds: selectedQueueIds };
@@ -327,6 +345,27 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     )}
                   </Paper>
                 )}
+                <div>
+                  <Field
+                    as={TextField}
+                    select
+                    label={i18n.t("whatsappModal.form.rodizioAgent")}
+                    name="rodizioAgentId"
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    helperText={i18n.t("whatsappModal.form.rodizioAgentHelper")}
+                  >
+                    <MenuItem value="">
+                      {i18n.t("whatsappModal.form.rodizioAgentAuto")}
+                    </MenuItem>
+                    {agents.map(a => (
+                      <MenuItem key={a.id} value={a.id}>
+                        {a.name}
+                      </MenuItem>
+                    ))}
+                  </Field>
+                </div>
                 <div>
                   <Field
                     as={TextField}

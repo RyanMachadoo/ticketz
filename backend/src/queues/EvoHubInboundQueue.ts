@@ -159,7 +159,8 @@ evoHubInboundQueue.process(async job => {
         await handleCampaignButtonLead({
           companyId,
           ticketId: ticket.id,
-          buttonText: body
+          buttonText: body,
+          whatsappId: whatsapp.id
         });
       }
 

@@ -494,6 +494,7 @@ export async function transferTicketToHuman(params: {
   filaNome?: string;
   motivo?: string;
   sellerPreference?: string;
+  agentId?: number | null; // força o agente do rodízio (ex.: conexão aponta pro agente)
 }): Promise<TransferResult> {
   const {
     companyId,
@@ -501,15 +502,26 @@ export async function transferTicketToHuman(params: {
     transferQueueId,
     filaNome,
     motivo,
-    sellerPreference
+    sellerPreference,
+    agentId
   } = params;
   const ticket = await Ticket.findByPk(ticketId);
   if (!ticket) return { targetQueueId: null, seller: null };
 
-  // Carrega o agente da fila ATUAL (antes de mover) para o rodízio de vendedores.
+  // Resolução do agente do rodízio, por prioridade:
+  //   1) agentId explícito (ex.: a conexão aponta para um agente);
+  //   2) agente da fila ATUAL do ticket (antes de mover);
+  //   3) 1º agente com vendedores configurado na empresa (fallback).
   let agent: AIAgent | null = null;
   try {
-    if (ticket.queueId) {
+    if (agentId) {
+      agent = await AIAgent.findByPk(agentId);
+    }
+  } catch (e) {
+    // best-effort
+  }
+  try {
+    if (!agent && ticket.queueId) {
       const origQueue = await Queue.findByPk(ticket.queueId);
       if (origQueue && origQueue.aiAgentId) {
         agent = await AIAgent.findByPk(origQueue.aiAgentId);
@@ -519,9 +531,6 @@ export async function transferTicketToHuman(params: {
     // best-effort
   }
 
-  // Fallback: se o handoff não partiu de uma fila de IA (ex.: lead de campanha
-  // que tocou num botão, sem agente vinculado), ainda assim resolve um agente
-  // com rodízio de vendedores configurado para a empresa.
   if (!agent) {
     agent = await resolveSellerAgent(companyId);
   }

@@ -1,6 +1,8 @@
 import { GetCompanySetting } from "../../helpers/CheckSettings";
 import { transferTicketToHuman } from "../AIAgentServices/AgentToolRunner";
 import { resolveSellerAgent } from "../AIAgentServices/AgentSellerService";
+import Whatsapp from "../../models/Whatsapp";
+import AIAgent from "../../models/AIAgent";
 import { logger } from "../../utils/logger";
 
 /**
@@ -26,8 +28,9 @@ export async function handleCampaignButtonLead(params: {
   companyId: number;
   ticketId: number;
   buttonText: string;
+  whatsappId?: number; // conexão onde a resposta chegou (aponta pro agente do rodízio)
 }): Promise<boolean> {
-  const { companyId, ticketId } = params;
+  const { companyId, ticketId, whatsappId } = params;
   const btn = String(params.buttonText || "").trim();
   if (!btn) return false;
 
@@ -41,14 +44,24 @@ export async function handleCampaignButtonLead(params: {
       .filter(Boolean);
     if (!triggers.includes(norm(btn))) return false; // botão não é de interesse
 
-    // Agente com rodízio de vendedores (para pegar a fila de destino).
-    const agent = await resolveSellerAgent(companyId);
+    // Agente do rodízio: 1) o configurado NA CONEXÃO (rodizioAgentId); senão
+    // 2) o 1º agente com vendedores da empresa. Usado para a fila de destino e
+    // repassado ao handoff (que respeita o agentId explícito).
+    let agent: AIAgent | null = null;
+    if (whatsappId) {
+      const connection = await Whatsapp.findByPk(whatsappId);
+      if (connection?.rodizioAgentId) {
+        agent = await AIAgent.findByPk(connection.rodizioAgentId);
+      }
+    }
+    if (!agent) agent = await resolveSellerAgent(companyId);
     const transferQueueId = agent?.transferQueueId || null;
 
     const result = await transferTicketToHuman({
       companyId,
       ticketId,
       transferQueueId,
+      agentId: agent?.id || null,
       motivo: `Lead de campanha — o cliente tocou em "${btn}".`
     });
 
