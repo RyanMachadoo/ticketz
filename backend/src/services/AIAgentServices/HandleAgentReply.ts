@@ -107,6 +107,11 @@ const jaccard = (a: Set<string>, b: Set<string>): number => {
 // Cliente pedindo/insistindo em desconto.
 const DISCOUNT_RE = /(descont|abaix|mais barat|melhor(a|ar)?\s*o?\s*pre|ultimo\s*pre|ultima?\s*oferta|faz\s*por|cobre|cobrir|preco\s*menor|baratinh|desconta|chora)/;
 
+// Despedida/handoff do PRÓPRIO agente (mensagem fromMe). Quando isto aparece no
+// histórico e o cliente volta a falar DEPOIS, o modelo tende a "achar" que já
+// saiu da conversa e responde VAZIO — então recomeçamos logo após esse ponto.
+const GOODBYE_RE = /(passar (voce )?(pra|para|pro) (um |uma )?(vendedor|humano|atendente|pessoa)|vou te passar|te passo (pra|para)|te passar (pra|para)|transferir|transferindo|ja ja alguem (fala|te)|alguem (da equipe|ja ja)|um vendedor (que cuida|vai|ja)|atendimento humano|chamar um vendedor|sequencia com um vendedor|dar sequencia)/;
+
 /** Monta o bloco de campanhas vigentes (só as ativas) para o contexto. */
 function formatCampaigns(campaigns: any[]): string {
   const active = (Array.isArray(campaigns) ? campaigns : []).filter(
@@ -244,6 +249,37 @@ async function buildConversation(
       if (lastFromMeIdx + 1 > startIdx) startIdx = lastFromMeIdx + 1;
       freshStartApplied = true;
     }
+  }
+
+  // Corte por DESPEDIDA/HANDOFF (vale SEMPRE, não só na reativação): se o agente
+  // se despediu/transferiu em algum ponto ("vou te passar para um vendedor"...) e
+  // o cliente voltou a falar DEPOIS, recomeça logo após essa despedida. Isso
+  // remove o rastro que faz o modelo responder VAZIO, mas PRESERVA o contexto que
+  // veio depois (ao contrário de reduzir a uma só mensagem).
+  let goodbyeCutApplied = false;
+  if (messages.length) {
+    let lastGoodbyeIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.fromMe && GOODBYE_RE.test(normalizeText(m.body || ""))) {
+        lastGoodbyeIdx = i;
+        break;
+      }
+    }
+    if (lastGoodbyeIdx >= 0) {
+      const hasCustomerAfter = messages
+        .slice(lastGoodbyeIdx + 1)
+        .some(m => !m.fromMe && (m.body || "").trim());
+      if (hasCustomerAfter && lastGoodbyeIdx + 1 > startIdx) {
+        startIdx = lastGoodbyeIdx + 1;
+        goodbyeCutApplied = true;
+      }
+    }
+  }
+
+  if (freshStartApplied || goodbyeCutApplied) {
+    // nenhum log de corpo (privacidade) — só o sinal de que houve corte.
+    freshStartApplied = true;
   }
 
   const slice = messages.slice(startIdx);
