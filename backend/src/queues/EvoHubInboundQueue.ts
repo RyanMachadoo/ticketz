@@ -2,6 +2,7 @@ import Bull from "bull";
 import { logger } from "../utils/logger";
 import Whatsapp from "../models/Whatsapp";
 import Message from "../models/Message";
+import CampaignShipping from "../models/CampaignShipping";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../services/TicketServices/FindOrCreateTicketService";
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
@@ -208,6 +209,37 @@ evoHubInboundQueue.process(async job => {
     for (const st of value.statuses || []) {
       const ack = ACK_MAP[st.status] ?? 0;
       await Message.update({ ack }, { where: { id: st.id } });
+
+      // Auditoria de campanha: atualiza o disparo correspondente (por wamid)
+      // com o status real da Meta e a data/hora do evento. Best-effort.
+      try {
+        const when = st.timestamp
+          ? new Date(Number(st.timestamp) * 1000)
+          : new Date();
+        const patch: any = { ackStatus: st.status };
+        if (st.status === "delivered") patch.ackDeliveredAt = when;
+        else if (st.status === "read") patch.ackReadAt = when;
+        else if (st.status === "failed") {
+          patch.ackFailedAt = when;
+          patch.failReason =
+            st.errors?.[0]?.message ||
+            st.errors?.[0]?.title ||
+            st.errors?.[0]?.error_data?.details ||
+            "falha no envio";
+        }
+        const [updated] = await CampaignShipping.update(patch, {
+          where: { wamid: st.id }
+        });
+        if (updated) {
+          logger.info(
+            `[Campanha][auditoria] disparo wamid=${st.id} -> ${st.status}${
+              patch.failReason ? ` (${patch.failReason})` : ""
+            }`
+          );
+        }
+      } catch (e) {
+        // best-effort
+      }
     }
   }
 });

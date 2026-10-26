@@ -1,6 +1,7 @@
 import {
   Table,
   Column,
+  DataType,
   CreatedAt,
   UpdatedAt,
   Model,
@@ -53,6 +54,33 @@ class CampaignShipping extends Model<CampaignShipping> {
 
   @Column
   deliveredAt: Date;
+
+  // ===== Auditoria do disparo (comprovação) =====
+  // Identificador da mensagem na Meta (wamid) — casa com os eventos de status.
+  @Column
+  wamid: string;
+
+  // Texto EXATO enviado a este destinatário (template já renderizado com as
+  // variáveis do contato). É a comprovação de "como a mensagem chegou".
+  @Column(DataType.TEXT)
+  sentBody: string;
+
+  // Último status da Meta: "sent" | "delivered" | "read" | "failed".
+  @Column
+  ackStatus: string;
+
+  @Column
+  ackDeliveredAt: Date;
+
+  @Column
+  ackReadAt: Date;
+
+  @Column
+  ackFailedAt: Date;
+
+  // Motivo da falha (mensagem de erro da Meta), quando status = failed.
+  @Column(DataType.TEXT)
+  failReason: string;
 
   @CreatedAt
   createdAt: Date;

@@ -8,6 +8,7 @@ import path from "path";
 import ListService from "../services/CampaignService/ListService";
 import CreateService from "../services/CampaignService/CreateService";
 import ShowService from "../services/CampaignService/ShowService";
+import ShippingsService from "../services/CampaignService/ShippingsService";
 import UpdateService from "../services/CampaignService/UpdateService";
 import DeleteService from "../services/CampaignService/DeleteService";
 import FindService from "../services/CampaignService/FindService";
@@ -83,6 +84,19 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
 
   const record = await ShowService(id);
+
+  return res.status(200).json(record);
+};
+
+// Relatório de disparos: mensagem enviada + lista de destinatários.
+export const shippings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { id } = req.params;
+  const { companyId } = req.user;
+
+  const record = await ShippingsService(id, companyId);
 
   return res.status(200).json(record);
 };

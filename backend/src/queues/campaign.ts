@@ -751,7 +751,14 @@ async function dispatchOfficialCampaign(
     wamid
   );
 
-  await campaignShipping.update({ deliveredAt: moment() });
+  // Auditoria: guarda o texto EXATO enviado a este destinatário e o wamid
+  // (para casar com os eventos de status da Meta: entregue/lido/falhou).
+  await campaignShipping.update({
+    deliveredAt: moment(),
+    wamid: wamid || null,
+    sentBody: historyBody,
+    ackStatus: "sent"
+  });
 }
 
 async function handleDispatchCampaign(job) {

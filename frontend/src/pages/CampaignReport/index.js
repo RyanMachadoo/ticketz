@@ -8,7 +8,20 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 
-import { Grid, LinearProgress, Typography } from "@material-ui/core";
+import {
+  Grid,
+  LinearProgress,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Chip,
+  Button
+} from "@material-ui/core";
+import GetAppIcon from "@material-ui/icons/GetApp";
+import Papa from "papaparse";
 import api from "../../services/api";
 import { has, get, isNull } from "lodash";
 import CardCounter from "../../components/Dashboard/CardCounter";
@@ -51,6 +64,10 @@ const CampaignReport = () => {
   const [confirmed, setConfirmed] = useState(0);
   const [percent, setPercent] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [messagePreview, setMessagePreview] = useState("");
+  const [shippings, setShippings] = useState([]);
+  const [shippingSummary, setShippingSummary] = useState({});
+  const [loadingShippings, setLoadingShippings] = useState(false);
   const mounted = useRef(true);
 
   const { datetimeToClient } = useDate();
@@ -60,6 +77,7 @@ const CampaignReport = () => {
   useEffect(() => {
     if (mounted.current) {
       findCampaign();
+      findShippings();
     }
 
     return () => {
@@ -109,6 +127,71 @@ const CampaignReport = () => {
     setConfirmed(data.confirmed);
     setDelivered(data.delivered);
     setLoading(false);
+  };
+
+  const findShippings = async () => {
+    setLoadingShippings(true);
+    try {
+      const { data } = await api.get(`/campaigns/${campaignId}/shippings`);
+      setMessagePreview(data.messagePreview || "");
+      setShippings(Array.isArray(data.rows) ? data.rows : []);
+      setShippingSummary({
+        total: data.total,
+        sent: data.sent,
+        delivered: data.delivered,
+        read: data.read,
+        failed: data.failed
+      });
+    } catch (err) {
+      // best-effort: relatório de disparos é complementar
+    }
+    setLoadingShippings(false);
+  };
+
+  // Status real da Meta -> rótulo/cor para auditoria.
+  const ackLabel = row => {
+    if (row.ackFailedAt || row.ackStatus === "failed") return "Falhou";
+    if (row.ackReadAt || row.ackStatus === "read") return "Lido";
+    if (row.ackDeliveredAt || row.ackStatus === "delivered") return "Entregue";
+    if (row.deliveredAt || row.ackStatus === "sent") return "Enviado";
+    return "Pendente";
+  };
+
+  const ackColor = row => {
+    const label = ackLabel(row);
+    if (label === "Lido") return "primary";
+    if (label === "Falhou") return "secondary";
+    return "default";
+  };
+
+  const exportCsv = () => {
+    const toBr = v => (v ? datetimeToClient(v) : "");
+    const rows = shippings.map(r => ({
+      Nome: r.name,
+      Numero: r.number,
+      Status: ackLabel(r),
+      "Enviado em": toBr(r.deliveredAt),
+      "Entregue em": toBr(r.ackDeliveredAt),
+      "Lido em": toBr(r.ackReadAt),
+      "Falhou em": toBr(r.ackFailedAt),
+      "Motivo da falha": r.failReason || "",
+      Mensagem: r.message || "",
+      Origem: r.messageExact ? "capturada no envio" : "reconstruída",
+      wamid: r.wamid || ""
+    }));
+    const csv = Papa.unparse(rows, { delimiter: ";" });
+    // BOM para o Excel abrir com acentuação correta.
+    const blob = new Blob(["﻿" + csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `campanha-${campaignId}-disparos.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const formatStatus = val => {
@@ -222,6 +305,126 @@ const CampaignReport = () => {
             />
           </Grid>
         </Grid>
+      </Paper>
+
+      <Paper
+        className={classes.mainPaper}
+        variant="outlined"
+        style={{ marginTop: 12 }}
+      >
+        <Typography variant="h6" component="h2" gutterBottom>
+          Mensagem enviada
+        </Typography>
+        <Typography
+          variant="body2"
+          component="pre"
+          style={{
+            whiteSpace: "pre-wrap",
+            fontFamily: "inherit",
+            background: "rgba(0,0,0,0.04)",
+            padding: 12,
+            borderRadius: 6,
+            margin: 0
+          }}
+        >
+          {messagePreview || "—"}
+        </Typography>
+
+        <Grid
+          container
+          justifyContent="space-between"
+          alignItems="center"
+          style={{ marginTop: 20 }}
+        >
+          <Typography variant="h6" component="h2">
+            Destinatários ({shippings.length}) — enviados{" "}
+            {shippingSummary.sent || 0}, entregues{" "}
+            {shippingSummary.delivered || 0}, lidos {shippingSummary.read || 0}
+            {shippingSummary.failed ? `, falhas ${shippingSummary.failed}` : ""}
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<GetAppIcon />}
+            onClick={exportCsv}
+            disabled={!shippings.length}
+          >
+            Exportar CSV
+          </Button>
+        </Grid>
+        {loadingShippings && <LinearProgress style={{ marginBottom: 8 }} />}
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Nome</TableCell>
+              <TableCell>Número</TableCell>
+              <TableCell align="center">Status</TableCell>
+              <TableCell align="center">Enviado</TableCell>
+              <TableCell align="center">Entregue</TableCell>
+              <TableCell align="center">Lido</TableCell>
+              <TableCell>Mensagem</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {shippings.map(row => (
+              <TableRow key={row.id}>
+                <TableCell>{row.name}</TableCell>
+                <TableCell>{row.number}</TableCell>
+                <TableCell align="center">
+                  <Chip size="small" label={ackLabel(row)} color={ackColor(row)} />
+                  {row.failReason && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      display="block"
+                    >
+                      {row.failReason}
+                    </Typography>
+                  )}
+                </TableCell>
+                <TableCell align="center">
+                  {row.deliveredAt ? datetimeToClient(row.deliveredAt) : "—"}
+                </TableCell>
+                <TableCell align="center">
+                  {row.ackDeliveredAt
+                    ? datetimeToClient(row.ackDeliveredAt)
+                    : "—"}
+                </TableCell>
+                <TableCell align="center">
+                  {row.ackReadAt ? datetimeToClient(row.ackReadAt) : "—"}
+                </TableCell>
+                <TableCell>
+                  <Typography
+                    variant="caption"
+                    component="pre"
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      fontFamily: "inherit",
+                      margin: 0
+                    }}
+                  >
+                    {row.message}
+                  </Typography>
+                  {!row.messageExact && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label="reconstruída"
+                      style={{ marginTop: 4 }}
+                    />
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+            {!loadingShippings && shippings.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  Nenhum disparo registrado.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </Paper>
     </MainContainer>
   );
