@@ -136,11 +136,37 @@ export async function getMediaUrl(whatsapp: Whatsapp, mediaId: string): Promise<
   return data?.url;
 }
 
-/** Lista templates aprovados na WABA. */
+/**
+ * Lista templates aprovados na WABA.
+ * O endpoint do EvoHub às vezes devolve um erro de TLS intermitente
+ * ("tlsv1 unrecognized name" / EPROTO) em alguns nós do balanceador. Então
+ * fazemos algumas tentativas com pequeno backoff antes de desistir.
+ */
 export async function getTemplates(whatsapp: Whatsapp): Promise<any[]> {
   const api = client(whatsapp);
-  const { data } = await api.get(`/${whatsapp.evohubWabaId}/message_templates`, {
-    params: { fields: "name,status,category,language,components", limit: 100 }
-  });
-  return data?.data || [];
+  const maxTries = 4;
+  let lastErr: any = null;
+  for (let attempt = 1; attempt <= maxTries; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const { data } = await api.get(
+        `/${whatsapp.evohubWabaId}/message_templates`,
+        { params: { fields: "name,status,category,language,components", limit: 100 } }
+      );
+      return data?.data || [];
+    } catch (err: any) {
+      lastErr = err;
+      const msg = String(err?.message || "");
+      const transient =
+        /EPROTO|unrecognized name|ECONNRESET|ETIMEDOUT|socket hang up|EAI_AGAIN/i.test(
+          msg
+        ) ||
+        err?.response?.status === 429 ||
+        err?.response?.status >= 500;
+      if (!transient || attempt === maxTries) break;
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise(r => setTimeout(r, 300 * attempt));
+    }
+  }
+  throw lastErr;
 }

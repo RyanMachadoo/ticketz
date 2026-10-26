@@ -59,7 +59,10 @@ export async function getCampaignTemplateDef(
     return null;
   }
   const key = String(campaign.id);
-  if (templateCache.has(key)) return templateCache.get(key);
+  // Só cacheamos SUCESSO (um template encontrado). Falha/não encontrado NÃO é
+  // cacheado — assim uma falha transitória de TLS não envenena o cache.
+  const cached = templateCache.get(key);
+  if (cached) return cached;
   try {
     const all = await EvoHubProvider.getTemplates(campaign.whatsapp);
     const lang = campaign.templateLanguage || "pt_BR";
@@ -69,13 +72,18 @@ export async function getCampaignTemplateDef(
       ) ||
       all.find((t: any) => t.name === campaign.templateName) ||
       null;
-    templateCache.set(key, tpl);
+    if (tpl) {
+      templateCache.set(key, tpl);
+    } else {
+      logger.warn(
+        `[Campanha][relatório] template '${campaign.templateName}' (lang=${lang}) NÃO encontrado entre ${all.length} templates da WABA.`
+      );
+    }
     return tpl;
   } catch (err: any) {
     logger.warn(
-      `[Campanha][relatório] não consegui buscar o template '${campaign.templateName}': ${err?.message}`
+      `[Campanha][relatório] falha ao buscar o template '${campaign.templateName}': ${err?.message}`
     );
-    templateCache.set(key, null);
     return null;
   }
 }
