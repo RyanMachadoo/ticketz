@@ -6,7 +6,9 @@ import AppError from "../../errors/AppError";
 import {
   getCampaignMessagePreview,
   getCampaignTemplateDef,
-  renderForRecipient
+  getCampaignTemplateStructured,
+  renderForRecipient,
+  TemplateStructured
 } from "./renderTemplate";
 
 export interface ShippingRow {
@@ -31,6 +33,7 @@ export interface ShippingsResult {
   campaignName: string;
   channel: string;
   messagePreview: string;
+  template: TemplateStructured; // imagem + corpo + rodapé + botões (preview "conversa")
   total: number;
   sent: number;
   delivered: number;
@@ -60,6 +63,9 @@ const ShippingsService = async (
   }
 
   const messagePreview = await getCampaignMessagePreview(campaign);
+  // Estrutura para o preview "conversa" (imagem + corpo + rodapé + botões).
+  const backendUrl = process.env.BACKEND_URL || "";
+  const template = await getCampaignTemplateStructured(campaign, backendUrl);
   // Definição do template (uma vez) para reconstruir disparos antigos.
   const tplDef = await getCampaignTemplateDef(campaign);
 
@@ -125,6 +131,7 @@ const ShippingsService = async (
     campaignName: campaign.name,
     channel: campaign.whatsapp?.channel || "whatsapp",
     messagePreview,
+    template,
     total: rows.length,
     sent,
     delivered,

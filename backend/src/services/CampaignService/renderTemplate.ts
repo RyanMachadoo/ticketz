@@ -80,6 +80,81 @@ export async function getCampaignTemplateDef(
   }
 }
 
+export interface TemplateStructured {
+  headerImageUrl: string | null;
+  headerText: string | null;
+  body: string;
+  footer: string | null;
+  buttons: string[];
+}
+
+/**
+ * Estrutura do template para exibir como "bolha de conversa" (imagem, corpo,
+ * rodapé e botões). A imagem é a que FOI enviada na campanha (mediaPath); se
+ * não houver, usa a imagem de exemplo do template. `backendUrl` monta a URL
+ * pública da mídia.
+ */
+export async function getCampaignTemplateStructured(
+  campaign: Campaign,
+  backendUrl: string
+): Promise<TemplateStructured> {
+  const out: TemplateStructured = {
+    headerImageUrl: null,
+    headerText: null,
+    body: "",
+    footer: null,
+    buttons: []
+  };
+
+  // Imagem efetivamente enviada (anexada à campanha).
+  if (campaign.mediaPath) {
+    out.headerImageUrl = String(campaign.mediaPath).startsWith("http")
+      ? campaign.mediaPath
+      : `${backendUrl || ""}/public/${campaign.mediaPath}`;
+  }
+
+  const isOfficial = campaign.whatsapp?.channel === "whatsapp_oficial";
+  if (isOfficial && campaign.templateName) {
+    const tpl = await getCampaignTemplateDef(campaign);
+    const params = (isArray(campaign.templateParams)
+      ? campaign.templateParams
+      : []
+    ).map(p => String(p ?? ""));
+    if (tpl && isArray(tpl.components)) {
+      for (const c of tpl.components) {
+        const type = String(c?.type || "").toUpperCase();
+        if (type === "HEADER") {
+          const fmt = String(c?.format || "TEXT").toUpperCase();
+          if (fmt === "TEXT" && c.text) {
+            out.headerText = fillPlaceholders(c.text, params);
+          } else if (fmt === "IMAGE" && !out.headerImageUrl) {
+            // Imagem de exemplo do template (quando a campanha não anexou uma).
+            const ex =
+              c?.example?.header_handle?.[0] ||
+              c?.example?.header_url?.[0] ||
+              null;
+            if (ex) out.headerImageUrl = ex;
+          }
+        } else if (type === "BODY") {
+          out.body = fillPlaceholders(c.text, params);
+        } else if (type === "FOOTER") {
+          out.footer = c.text ? String(c.text) : null;
+        } else if (type === "BUTTONS") {
+          out.buttons = (c.buttons || [])
+            .map((b: any) => String(b?.text || "").trim())
+            .filter(Boolean);
+        }
+      }
+    }
+    if (!out.body) out.body = `[Template: ${campaign.templateName}]`;
+    return out;
+  }
+
+  // Canal Baileys: corpo = 1ª mensagem configurada.
+  out.body = String(campaign.message1 || "").trim();
+  return out;
+}
+
 /** Substitui {nome}, {numero}, {email} pelos dados do contato (reconstrução). */
 export function processTokens(text: string, contact: any): string {
   let out = String(text || "");

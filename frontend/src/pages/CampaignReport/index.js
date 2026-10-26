@@ -49,6 +49,50 @@ const useStyles = makeStyles(theme => ({
   },
   tabPanelsContainer: {
     padding: theme.spacing(2)
+  },
+  // Bolha de conversa (como o cliente recebeu).
+  chatWrap: {
+    background:
+      theme.palette.type === "dark" ? "#0b141a" : "#e5ddd5",
+    padding: theme.spacing(2),
+    borderRadius: 8,
+    display: "flex",
+    justifyContent: "flex-start"
+  },
+  bubble: {
+    maxWidth: 420,
+    width: "100%",
+    background: theme.palette.type === "dark" ? "#202c33" : "#ffffff",
+    borderRadius: 10,
+    overflow: "hidden",
+    boxShadow: "0 1px 1px rgba(0,0,0,0.2)"
+  },
+  bubbleImg: {
+    width: "100%",
+    display: "block"
+  },
+  bubbleBody: {
+    padding: "8px 10px 4px 10px",
+    whiteSpace: "pre-wrap",
+    fontFamily: "inherit",
+    fontSize: 14,
+    margin: 0,
+    color: theme.palette.type === "dark" ? "#e9edef" : "#111b21"
+  },
+  bubbleFooter: {
+    padding: "0 10px 8px 10px",
+    fontSize: 12,
+    color: theme.palette.type === "dark" ? "#8696a0" : "#667781"
+  },
+  bubbleBtn: {
+    borderTop: `1px solid ${
+      theme.palette.type === "dark" ? "#2a3942" : "#e9edef"
+    }`,
+    padding: "10px",
+    textAlign: "center",
+    color: "#00a5f4",
+    fontSize: 14,
+    fontWeight: 500
   }
 }));
 
@@ -65,6 +109,7 @@ const CampaignReport = () => {
   const [percent, setPercent] = useState(0);
   const [loading, setLoading] = useState(false);
   const [messagePreview, setMessagePreview] = useState("");
+  const [template, setTemplate] = useState(null);
   const [shippings, setShippings] = useState([]);
   const [shippingSummary, setShippingSummary] = useState({});
   const [loadingShippings, setLoadingShippings] = useState(false);
@@ -134,6 +179,7 @@ const CampaignReport = () => {
     try {
       const { data } = await api.get(`/campaigns/${campaignId}/shippings`);
       setMessagePreview(data.messagePreview || "");
+      setTemplate(data.template || null);
       setShippings(Array.isArray(data.rows) ? data.rows : []);
       setShippingSummary({
         total: data.total,
@@ -313,22 +359,35 @@ const CampaignReport = () => {
         style={{ marginTop: 12 }}
       >
         <Typography variant="h6" component="h2" gutterBottom>
-          Mensagem enviada
+          Mensagem enviada (como o cliente recebeu)
         </Typography>
-        <Typography
-          variant="body2"
-          component="pre"
-          style={{
-            whiteSpace: "pre-wrap",
-            fontFamily: "inherit",
-            background: "rgba(0,0,0,0.04)",
-            padding: 12,
-            borderRadius: 6,
-            margin: 0
-          }}
-        >
-          {messagePreview || "—"}
-        </Typography>
+        <div className={classes.chatWrap}>
+          <div className={classes.bubble}>
+            {template?.headerImageUrl && (
+              <img
+                src={template.headerImageUrl}
+                alt="imagem da campanha"
+                className={classes.bubbleImg}
+              />
+            )}
+            <div className={classes.bubbleBody}>
+              {template?.headerText && (
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  {template.headerText}
+                </div>
+              )}
+              {(template?.body || messagePreview || "—")}
+            </div>
+            {template?.footer && (
+              <div className={classes.bubbleFooter}>{template.footer}</div>
+            )}
+            {(template?.buttons || []).map((b, i) => (
+              <div key={i} className={classes.bubbleBtn}>
+                {b}
+              </div>
+            ))}
+          </div>
+        </div>
 
         <Grid
           container
