@@ -1,6 +1,8 @@
+import { Op } from "sequelize";
 import Campaign from "../../models/Campaign";
 import CampaignShipping from "../../models/CampaignShipping";
 import ContactListItem from "../../models/ContactListItem";
+import Contact from "../../models/Contact";
 import Whatsapp from "../../models/Whatsapp";
 import AppError from "../../errors/AppError";
 import {
@@ -24,6 +26,7 @@ export interface ShippingRow {
   wamid: string | null;
   message: string; // texto exato enviado a este destinatário
   messageExact: boolean; // true = capturado no envio; false = reconstruído
+  profilePicUrl: string | null; // foto de perfil (se o contato tiver no sistema)
   confirmationRequestedAt: Date | null;
   confirmedAt: Date | null;
 }
@@ -54,8 +57,10 @@ const ShippingsService = async (
   id: string | number,
   companyId: number
 ): Promise<ShippingsResult> => {
+  // Carrega a conexão COMPLETA (inclui credenciais do EvoHub) — necessário para
+  // buscar o template na Meta e renderizar o texto real (não só o nome).
   const campaign = await Campaign.findByPk(id, {
-    include: [{ model: Whatsapp, attributes: ["id", "name", "channel"] }]
+    include: [{ model: Whatsapp }]
   });
 
   if (!campaign || campaign.companyId !== companyId) {
@@ -77,6 +82,32 @@ const ShippingsService = async (
       ["id", "ASC"]
     ]
   });
+
+  // Foto de perfil: a API oficial da Meta NÃO fornece foto de contato. Então
+  // reaproveitamos a foto que o sistema já tenha salvo no Contato (por número).
+  const numbers = Array.from(
+    new Set(
+      shippings
+        .map((s: any) => String(s.number || "").replace(/\D/g, ""))
+        .filter(Boolean)
+    )
+  );
+  const picByNumber = new Map<string, string>();
+  if (numbers.length) {
+    try {
+      const contacts = await Contact.findAll({
+        where: { companyId, number: { [Op.in]: numbers } },
+        attributes: ["number", "profilePicUrl"]
+      });
+      contacts.forEach((c: any) => {
+        if (c.profilePicUrl) {
+          picByNumber.set(String(c.number).replace(/\D/g, ""), c.profilePicUrl);
+        }
+      });
+    } catch (e) {
+      // best-effort: sem foto, usa o avatar padrão
+    }
+  }
 
   let sent = 0;
   let delivered = 0;
@@ -121,6 +152,8 @@ const ShippingsService = async (
       wamid: s.wamid || null,
       message,
       messageExact,
+      profilePicUrl:
+        picByNumber.get(String(s.number || "").replace(/\D/g, "")) || null,
       confirmationRequestedAt: s.confirmationRequestedAt || null,
       confirmedAt: s.confirmedAt || null
     };

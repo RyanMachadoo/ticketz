@@ -45,6 +45,7 @@ const useStyles = makeStyles(() => ({
     height: 36,
     borderRadius: "50%",
     background: "rgba(255,255,255,0.25)",
+    objectFit: "cover",
     flexShrink: 0
   },
   headerName: {
@@ -173,7 +174,15 @@ const CampaignPhonePreview = ({
         <div className={classes.phone}>
           <div className={classes.header}>
             <ArrowBackIcon fontSize="small" />
-            <div className={classes.avatar} />
+            {recipient.profilePicUrl ? (
+              <img
+                src={recipient.profilePicUrl}
+                alt=""
+                className={classes.avatar}
+              />
+            ) : (
+              <div className={classes.avatar} />
+            )}
             <div>
               <div className={classes.headerName}>
                 {recipient.name || recipient.number}
