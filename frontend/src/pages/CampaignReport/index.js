@@ -21,8 +21,11 @@ import {
   Button
 } from "@material-ui/core";
 import GetAppIcon from "@material-ui/icons/GetApp";
+import SmartphoneIcon from "@material-ui/icons/Smartphone";
+import { IconButton } from "@material-ui/core";
 import Papa from "papaparse";
 import api from "../../services/api";
+import CampaignPhonePreview from "../../components/CampaignPhonePreview";
 import { has, get, isNull } from "lodash";
 import CardCounter from "../../components/Dashboard/CardCounter";
 import GroupIcon from "@material-ui/icons/Group";
@@ -113,6 +116,7 @@ const CampaignReport = () => {
   const [shippings, setShippings] = useState([]);
   const [shippingSummary, setShippingSummary] = useState({});
   const [loadingShippings, setLoadingShippings] = useState(false);
+  const [phoneRecipient, setPhoneRecipient] = useState(null);
   const mounted = useRef(true);
 
   const { datetimeToClient } = useDate();
@@ -422,6 +426,7 @@ const CampaignReport = () => {
               <TableCell align="center">Entregue</TableCell>
               <TableCell align="center">Lido</TableCell>
               <TableCell>Mensagem</TableCell>
+              <TableCell align="center">Conversa</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -473,11 +478,20 @@ const CampaignReport = () => {
                     />
                   )}
                 </TableCell>
+                <TableCell align="center">
+                  <IconButton
+                    size="small"
+                    title="Ver conversa (celular)"
+                    onClick={() => setPhoneRecipient(row)}
+                  >
+                    <SmartphoneIcon />
+                  </IconButton>
+                </TableCell>
               </TableRow>
             ))}
             {!loadingShippings && shippings.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   Nenhum disparo registrado.
                 </TableCell>
               </TableRow>
@@ -485,6 +499,13 @@ const CampaignReport = () => {
           </TableBody>
         </Table>
       </Paper>
+
+      <CampaignPhonePreview
+        open={!!phoneRecipient}
+        onClose={() => setPhoneRecipient(null)}
+        recipient={phoneRecipient}
+        template={template}
+      />
     </MainContainer>
   );
 };
