@@ -42,6 +42,7 @@ import aiAgentRoutes from "./aiAgentRoutes";
 import aiTraceRoutes from "./aiTraceRoutes";
 import estoqueRoutes from "./estoqueRoutes";
 import ctwaRoutes from "./ctwaRoutes";
+import automationRoutes from "./automationRoutes";
 
 const routes = Router();
 
@@ -56,6 +57,7 @@ routes.use(aiAgentRoutes);
 routes.use(aiTraceRoutes);
 routes.use(estoqueRoutes);
 routes.use(ctwaRoutes);
+routes.use(automationRoutes);
 routes.use(contactRoutes);
 routes.use(ticketRoutes);
 routes.use(buildCaptureExtensionRoutes);

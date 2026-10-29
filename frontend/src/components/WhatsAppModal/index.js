@@ -90,13 +90,17 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     evohubToken: "",
     evohubPhoneNumberId: "",
     evohubWabaId: "",
-    // Rodízio de vendedores por conexão: aponta para um agente de IA cuja
-    // config de rodízio (vendedores + conexão de aviso) será usada no handoff.
-    rodizioAgentId: ""
+    // Rodízio de vendedores por conexão: aponta para um agente de IA (fallback).
+    rodizioAgentId: "",
+    // Roteamento próprio da conexão (fonte preferida).
+    sellers: [],
+    notifyWhatsappId: "",
+    qualityNumber: ""
   };
   const [whatsApp, setWhatsApp] = useState(initialState);
   const [selectedQueueIds, setSelectedQueueIds] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [connections, setConnections] = useState([]);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -112,7 +116,19 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
           evohubToken: data.evohubToken || "",
           evohubPhoneNumberId: data.evohubPhoneNumberId || "",
           evohubWabaId: data.evohubWabaId || "",
-          rodizioAgentId: data.rodizioAgentId ?? ""
+          rodizioAgentId: data.rodizioAgentId ?? "",
+          sellers: Array.isArray(data.sellers)
+            ? data.sellers.map(s => ({
+                nome: s.nome || "",
+                numero: s.numero || "",
+                ativo: s.ativo === undefined ? true : !!s.ativo,
+                aliases: Array.isArray(s.aliases)
+                  ? s.aliases.join(", ")
+                  : s.aliases || ""
+              }))
+            : [],
+          notifyWhatsappId: data.notifyWhatsappId ?? "",
+          qualityNumber: data.qualityNumber || ""
         }));
 
         const whatsQueueIds = data.queues?.map(queue => queue.id);
@@ -137,10 +153,36 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     fetchAgents();
   }, []);
 
+  // Lista de conexões (para o select da conexão de aviso — ideal: Baileys).
+  useEffect(() => {
+    const fetchConnections = async () => {
+      try {
+        const { data } = await api.get("/whatsapp");
+        setConnections(Array.isArray(data) ? data : data?.records || []);
+      } catch (err) {
+        // best-effort
+      }
+    };
+    fetchConnections();
+  }, []);
+
   const handleSaveWhatsApp = async values => {
     const whatsappData = { ...values, queueIds: selectedQueueIds };
     delete whatsappData["queues"];
     delete whatsappData["session"];
+    // Normaliza o roteamento (aliases string -> array; "" -> null).
+    whatsappData.sellers = (values.sellers || []).map(s => ({
+      nome: (s.nome || "").trim(),
+      numero: (s.numero || "").replace(/\D/g, ""),
+      ativo: s.ativo === undefined ? true : !!s.ativo,
+      aliases: (s.aliases || "")
+        .split(",")
+        .map(a => a.trim())
+        .filter(Boolean)
+    }));
+    whatsappData.notifyWhatsappId =
+      values.notifyWhatsappId === "" ? null : Number(values.notifyWhatsappId);
+    whatsappData.qualityNumber = (values.qualityNumber || "").replace(/\D/g, "");
 
     try {
       if (whatsAppId) {
@@ -185,7 +227,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
             }, 400);
           }}
         >
-          {({ values, touched, errors, isSubmitting }) => (
+          {({ values, touched, errors, isSubmitting, setFieldValue }) => (
             <Form>
               <DialogContent dividers>
                 <div className={classes.multFieldLine}>
@@ -366,6 +408,151 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     ))}
                   </Field>
                 </div>
+
+                <Paper
+                  variant="outlined"
+                  style={{ padding: 12, marginTop: 8, marginBottom: 8 }}
+                >
+                  <Typography variant="subtitle2" gutterBottom>
+                    {i18n.t("whatsappModal.form.routingTitle")}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    style={{ display: "block", marginBottom: 8 }}
+                  >
+                    {i18n.t("whatsappModal.form.routingHint")}
+                  </Typography>
+
+                  {(values.sellers || []).map((s, idx) => (
+                    <Grid
+                      container
+                      spacing={1}
+                      alignItems="center"
+                      key={idx}
+                      style={{ marginBottom: 2 }}
+                    >
+                      <Grid item xs={12} sm={4}>
+                        <TextField
+                          label={i18n.t("whatsappModal.form.sellerName")}
+                          value={s.nome || ""}
+                          onChange={e =>
+                            setFieldValue(`sellers.${idx}.nome`, e.target.value)
+                          }
+                          fullWidth
+                          variant="outlined"
+                          margin="dense"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label={i18n.t("whatsappModal.form.sellerNumber")}
+                          value={s.numero || ""}
+                          onChange={e =>
+                            setFieldValue(`sellers.${idx}.numero`, e.target.value)
+                          }
+                          fullWidth
+                          variant="outlined"
+                          margin="dense"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label={i18n.t("whatsappModal.form.sellerAliases")}
+                          value={s.aliases || ""}
+                          onChange={e =>
+                            setFieldValue(`sellers.${idx}.aliases`, e.target.value)
+                          }
+                          fullWidth
+                          variant="outlined"
+                          margin="dense"
+                        />
+                      </Grid>
+                      <Grid item xs={6} sm={1}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              size="small"
+                              checked={s.ativo !== false}
+                              onChange={e =>
+                                setFieldValue(
+                                  `sellers.${idx}.ativo`,
+                                  e.target.checked
+                                )
+                              }
+                            />
+                          }
+                          label=""
+                        />
+                      </Grid>
+                      <Grid item xs={6} sm={1}>
+                        <Button
+                          size="small"
+                          color="secondary"
+                          onClick={() =>
+                            setFieldValue(
+                              "sellers",
+                              (values.sellers || []).filter((_, i) => i !== idx)
+                            )
+                          }
+                        >
+                          {i18n.t("whatsappModal.form.sellerRemove")}
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  ))}
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      setFieldValue("sellers", [
+                        ...(values.sellers || []),
+                        { nome: "", numero: "", aliases: "", ativo: true }
+                      ])
+                    }
+                  >
+                    {i18n.t("whatsappModal.form.sellerAdd")}
+                  </Button>
+
+                  <div style={{ marginTop: 8 }}>
+                    <Field
+                      as={TextField}
+                      select
+                      label={i18n.t("whatsappModal.form.notifyConnection")}
+                      name="notifyWhatsappId"
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      helperText={i18n.t(
+                        "whatsappModal.form.notifyConnectionHelper"
+                      )}
+                    >
+                      <MenuItem value="">
+                        {i18n.t("whatsappModal.form.notifyConnectionDefault")}
+                      </MenuItem>
+                      {connections.map(c => (
+                        <MenuItem key={c.id} value={c.id}>
+                          {c.name} (
+                          {c.channel === "whatsapp_oficial"
+                            ? "oficial"
+                            : "baileys"}
+                          )
+                        </MenuItem>
+                      ))}
+                    </Field>
+                  </div>
+                  <div>
+                    <Field
+                      as={TextField}
+                      label={i18n.t("whatsappModal.form.qualityNumber")}
+                      name="qualityNumber"
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      helperText={i18n.t("whatsappModal.form.qualityNumberHelper")}
+                    />
+                  </div>
+                </Paper>
+
                 <div>
                   <Field
                     as={TextField}

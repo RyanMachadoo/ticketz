@@ -26,8 +26,31 @@ export interface WhatsappData {
   evohubToken?: string;
   evohubPhoneNumberId?: string;
   evohubWabaId?: string;
-  // Rodízio de vendedores por conexão (aponta para um agente de IA).
+  // Rodízio de vendedores por conexão (aponta para um agente de IA — fallback).
   rodizioAgentId?: number | null;
+  // Roteamento próprio da conexão.
+  sellers?: any[];
+  notifyWhatsappId?: number | null;
+  qualityNumber?: string;
+}
+
+const onlyDigits = (s: string): string => String(s || "").replace(/\D/g, "");
+
+/** Normaliza o pool de vendedores salvo na conexão. */
+function sanitizeSellers(list: any[]): any[] {
+  return (Array.isArray(list) ? list : [])
+    .map((s: any) => ({
+      nome: String(s?.nome || "").trim(),
+      numero: onlyDigits(s?.numero),
+      aliases: Array.isArray(s?.aliases)
+        ? s.aliases.map((a: any) => String(a).trim()).filter(Boolean)
+        : String(s?.aliases || "")
+            .split(",")
+            .map((a: string) => a.trim())
+            .filter(Boolean),
+      ativo: s?.ativo === undefined ? true : !!s.ativo
+    }))
+    .filter(s => s.nome || s.numero);
 }
 
 interface Request {
@@ -69,7 +92,10 @@ const UpdateWhatsAppService = async ({
     evohubToken,
     evohubPhoneNumberId,
     evohubWabaId,
-    rodizioAgentId
+    rodizioAgentId,
+    sellers,
+    notifyWhatsappId,
+    qualityNumber
   } = whatsappData;
 
   try {
@@ -123,7 +149,15 @@ const UpdateWhatsAppService = async ({
     evohubPhoneNumberId,
     evohubWabaId,
     // Rodízio por conexão: normaliza "" / 0 para null.
-    rodizioAgentId: rodizioAgentId ? Number(rodizioAgentId) : null
+    rodizioAgentId: rodizioAgentId ? Number(rodizioAgentId) : null,
+    // Roteamento próprio da conexão.
+    ...(sellers !== undefined ? { sellers: sanitizeSellers(sellers) } : {}),
+    ...(notifyWhatsappId !== undefined
+      ? { notifyWhatsappId: notifyWhatsappId ? Number(notifyWhatsappId) : null }
+      : {}),
+    ...(qualityNumber !== undefined
+      ? { qualityNumber: qualityNumber ? onlyDigits(qualityNumber) : null }
+      : {})
   });
 
   if (queueIds) {

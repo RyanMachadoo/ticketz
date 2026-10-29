@@ -597,7 +597,22 @@ const messages = {
           rodizioAgent: "Seller round-robin agent",
           rodizioAgentAuto: "Automatic (first agent with sellers)",
           rodizioAgentHelper:
-            "Agent whose round-robin config (seller list and notify connection) is used for this connection's handoff — e.g. a campaign button lead.",
+            "Fallback: agent whose round-robin config is used when this connection has no own pool below.",
+          routingTitle: "Round-robin & alerts (this connection)",
+          routingHint:
+            "Seller pool, alert connection and quality contact for this connection. Used by campaigns, automations and AI. Takes priority over the agent.",
+          sellerName: "Seller",
+          sellerNumber: "Number (country+area)",
+          sellerAliases: "Aliases (comma)",
+          sellerRemove: "Remove",
+          sellerAdd: "+ Seller",
+          notifyConnection: "Alert connection (seller/quality)",
+          notifyConnectionHelper:
+            "Connection (ideally a secondary Baileys) used to send alerts, to avoid cost on the official connection.",
+          notifyConnectionDefault: "Default (ticket's)",
+          qualityNumber: "Quality contact number",
+          qualityNumberHelper:
+            "Receives the alert when a customer gives a low score (1-4) in automation surveys.",
           evohubWebhookLabel:
             "Webhook URL (register it in the EvoHub panel):",
           evohubWebhookCopied: "Webhook URL copied.",

@@ -182,12 +182,31 @@ class Whatsapp extends Model<Whatsapp> {
   usageOverridePeriod: string;
 
   // ===== Rodízio de vendedores (por conexão) =====
-  // Agente de IA cuja configuração de rodízio (lista de vendedores + conexão de
-  // aviso) esta conexão usa para o handoff (ex.: lead de campanha por botão),
-  // mesmo quando o ticket não está numa fila com IA. null = resolve o 1º agente
-  // com vendedores da empresa.
+  // Agente de IA cuja configuração de rodízio esta conexão usa como FALLBACK,
+  // quando a própria conexão não tem pool configurado. Mantido por compat.
   @Column(DataType.INTEGER)
   rodizioAgentId: number;
+
+  // ===== Roteamento próprio da conexão (fonte preferida) =====
+  // Pool de vendedores do rodízio (lista de {nome, numero, aliases, ativo}).
+  @Default([])
+  @Column(DataType.JSONB)
+  sellers: any[];
+
+  // Ponteiro do round-robin do pool desta conexão.
+  @Default(0)
+  @Column(DataType.INTEGER)
+  sellerRotationIndex: number;
+
+  // Conexão (ideal: Baileys secundária) por onde os AVISOS (vendedor e
+  // qualidade) são enviados para leads que chegam nesta conexão.
+  @Column(DataType.INTEGER)
+  notifyWhatsappId: number;
+
+  // Número fixo do responsável de QUALIDADE (dígitos com DDI/DDD). Usado no
+  // aviso de nota baixa das automações.
+  @Column(DataType.STRING)
+  qualityNumber: string;
 }
 
 export default Whatsapp;

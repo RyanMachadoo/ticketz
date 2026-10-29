@@ -29,10 +29,9 @@ const norm = (s: string): string =>
   stripAccents(String(s || "")).toLowerCase().trim();
 const onlyDigits = (s: string): string => String(s || "").replace(/\D/g, "");
 
-/** Vendedores ativos e com número válido. */
-function activeSellers(agent: AIAgent): SellerConfig[] {
-  const list = Array.isArray(agent.sellers) ? agent.sellers : [];
-  return list
+/** Normaliza uma lista crua de vendedores para ativos e com número válido. */
+function normalizeSellers(list: any[]): SellerConfig[] {
+  return (Array.isArray(list) ? list : [])
     .map((s: any) => ({
       nome: String(s?.nome || "").trim(),
       numero: onlyDigits(s?.numero),
@@ -40,6 +39,16 @@ function activeSellers(agent: AIAgent): SellerConfig[] {
       ativo: s?.ativo === undefined ? true : !!s.ativo
     }))
     .filter(s => s.ativo && s.numero && s.nome);
+}
+
+/** Vendedores ativos de um "holder" (conexão ou agente) que tenha .sellers. */
+function activeSellersOf(holder: { sellers?: any[] } | null): SellerConfig[] {
+  return normalizeSellers(holder?.sellers || []);
+}
+
+/** Compat: vendedores ativos de um agente. */
+function activeSellers(agent: AIAgent): SellerConfig[] {
+  return activeSellersOf(agent);
 }
 
 /**
@@ -123,13 +132,13 @@ async function sendToSeller(
   connection: Whatsapp,
   numero: string,
   body: string,
-  agent: AIAgent
+  agent: AIAgent | null
 ): Promise<boolean> {
   try {
     if (connection && connection.channel === "whatsapp_oficial") {
-      const tpl = String(agent.sellerTemplateName || "").trim();
+      const tpl = String(agent?.sellerTemplateName || "").trim();
       if (tpl) {
-        const lang = String(agent.sellerTemplateLang || "pt_BR").trim() || "pt_BR";
+        const lang = String(agent?.sellerTemplateLang || "pt_BR").trim() || "pt_BR";
         // Parâmetros de template NÃO podem ter quebra de linha: compacta tudo.
         const compact = body
           .replace(/\s*\n\s*/g, " · ")
@@ -166,16 +175,16 @@ async function sendToSeller(
  * Retorna o vendedor avisado, ou null se não houver vendedor/for falha.
  */
 export async function handoffToSeller(params: {
-  agent: AIAgent;
+  agent?: AIAgent | null;
   companyId: number;
   contactName: string;
   contactNumber: string;
   motivo?: string;
   preference?: string;
-  whatsappId?: number; // conexão do ticket (preferida p/ enviar o aviso)
+  whatsappId?: number; // conexão do ticket (fonte preferida do roteamento)
 }): Promise<HandoffResult | null> {
   const {
-    agent,
+    agent = null,
     companyId,
     contactName,
     contactNumber,
@@ -184,14 +193,29 @@ export async function handoffToSeller(params: {
     whatsappId
   } = params;
   try {
-    const sellers = activeSellers(agent);
+    // Fonte do POOL (roteamento): a CONEXÃO do ticket primeiro; o agente é só
+    // fallback. Assim o rodízio não fica preso a um agente que pode não atuar.
+    const ticketConn = whatsappId
+      ? await Whatsapp.findByPk(whatsappId)
+      : null;
+
+    let poolHolder: any = null; // tem .sellers e .sellerRotationIndex
+    let sellers: SellerConfig[] = [];
+    if (ticketConn && activeSellersOf(ticketConn).length) {
+      poolHolder = ticketConn;
+      sellers = activeSellersOf(ticketConn);
+    } else if (agent && activeSellersOf(agent).length) {
+      poolHolder = agent;
+      sellers = activeSellersOf(agent);
+    }
+
     if (!sellers.length) {
       logger.warn(
-        `[Agente IA][rodízio] agente ${agent.id} sem vendedores ATIVOS/válidos (sellers brutos=${
-          Array.isArray(agent.sellers) ? agent.sellers.length : 0
-        }). Confira nome e número (só dígitos com DDI/DDD) de cada vendedor.`
+        `[rodízio] sem vendedores ATIVOS/válidos na conexão ${
+          ticketConn?.id || whatsappId || "?"
+        } nem no agente ${agent?.id || "-"}. Configure o pool na conexão (nome + número com DDI/DDD).`
       );
-      return null; // rodízio não configurado
+      return null;
     }
 
     let seller: SellerConfig | null = null;
@@ -203,11 +227,11 @@ export async function handoffToSeller(params: {
     }
 
     if (!seller) {
-      const idx = (Number(agent.sellerRotationIndex) || 0) % sellers.length;
+      const idx = (Number(poolHolder.sellerRotationIndex) || 0) % sellers.length;
       seller = sellers[idx];
-      // avança o ponteiro do rodízio (só quando foi round-robin)
+      // avança o ponteiro do rodízio na MESMA fonte do pool (conexão ou agente)
       try {
-        await agent.update({ sellerRotationIndex: idx + 1 });
+        await poolHolder.update({ sellerRotationIndex: idx + 1 });
       } catch (e) {
         // não crítico
       }
@@ -221,11 +245,15 @@ export async function handoffToSeller(params: {
       viaPreference
     });
 
-    // Conexão do aviso: 1) a configurada (ideal: Baileys secundário interno);
-    // 2) a do ticket; 3) a padrão da empresa.
+    // Conexão do AVISO: 1) notifyWhatsappId da conexão do ticket; 2) a do agente
+    // (compat); 3) a do ticket; 4) a padrão da empresa.
     let connection: Whatsapp | null = null;
-    const notifyId = Number(agent.sellerNotifyWhatsappId) || 0;
+    const notifyId =
+      Number(ticketConn?.notifyWhatsappId) ||
+      Number(agent?.sellerNotifyWhatsappId) ||
+      0;
     if (notifyId) connection = await Whatsapp.findByPk(notifyId);
+    if (!connection && ticketConn) connection = ticketConn;
     if (!connection && whatsappId) connection = await Whatsapp.findByPk(whatsappId);
     if (!connection) connection = await GetDefaultWhatsApp(companyId);
 

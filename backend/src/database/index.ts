@@ -47,6 +47,11 @@ import AIAgent from "../models/AIAgent";
 import CtwaReferral from "../models/CtwaReferral";
 import AgentMemory from "../models/AgentMemory";
 import AgentTrace from "../models/AgentTrace";
+import AutomationJourney from "../models/AutomationJourney";
+import AutomationStep from "../models/AutomationStep";
+import AutomationEnrollment from "../models/AutomationEnrollment";
+import AutomationTask from "../models/AutomationTask";
+import AutomationResponse from "../models/AutomationResponse";
 
 const dbConfig = require("../config/database");
 
@@ -106,7 +111,12 @@ const models = [
   AIAgent,
   CtwaReferral,
   AgentMemory,
-  AgentTrace
+  AgentTrace,
+  AutomationJourney,
+  AutomationStep,
+  AutomationEnrollment,
+  AutomationTask,
+  AutomationResponse
 ];
 
 sequelize.addModels(models);

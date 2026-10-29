@@ -597,7 +597,22 @@ const messages = {
           rodizioAgent: "Agente de rotación de vendedores",
           rodizioAgentAuto: "Automático (primer agente con vendedores)",
           rodizioAgentHelper:
-            "Agente cuya configuración de rotación (lista de vendedores y conexión de aviso) se usará en el handoff de esta conexión — ej.: lead de campaña por botón.",
+            "Fallback: agente cuya config de rotación se usa cuando esta conexión no tiene pool propio abajo.",
+          routingTitle: "Rotación y avisos (de esta conexión)",
+          routingHint:
+            "Pool de vendedores, conexión de aviso y responsable de calidad de esta conexión. Usado por campañas, automatizaciones e IA. Tiene prioridad sobre el agente.",
+          sellerName: "Vendedor",
+          sellerNumber: "Número (país+área)",
+          sellerAliases: "Alias (coma)",
+          sellerRemove: "Quitar",
+          sellerAdd: "+ Vendedor",
+          notifyConnection: "Conexión de aviso (vendedor/calidad)",
+          notifyConnectionHelper:
+            "Conexión (ideal: Baileys secundaria) por donde se envían los avisos, para no gastar en la conexión oficial.",
+          notifyConnectionDefault: "Predeterminada (la del ticket)",
+          qualityNumber: "Número del responsable de calidad",
+          qualityNumberHelper:
+            "Recibe el aviso cuando un cliente da una nota baja (1-4) en las encuestas de automatización.",
           evohubWebhookLabel:
             "URL de webhook (regístrala en el panel de EvoHub):",
           evohubWebhookCopied: "URL de webhook copiada.",

@@ -9,6 +9,7 @@ import CreateMessageService from "../services/MessageServices/CreateMessageServi
 import { saveReferral } from "../services/CtwaServices/CtwaService";
 import { dispatchWebhookEvent } from "../services/WebhookServices/DispatchWebhook";
 import { handleCampaignButtonLead } from "../services/CampaignService/HandleCampaignButtonLead";
+import { handleSurveyReply } from "../services/AutomationServices/HandleSurveyReplyService";
 
 /**
  * Processa em background os eventos recebidos do EvoHub (Cloud API oficial).
@@ -167,6 +168,18 @@ evoHubInboundQueue.process(async job => {
       const isButtonReply =
         msg.type === "button" ||
         (msg.type === "interactive" && !!msg.interactive?.button_reply);
+
+      // Resposta de uma PESQUISA de automação (PSI): casa pela wamid (context.id)
+      // da mensagem que enviamos. Ramifica por banda (nota 5 -> CEM/agradecimento;
+      // nota 1-4 -> avisa qualidade). Best-effort.
+      if (isButtonReply && body && msg.context?.id) {
+        await handleSurveyReply({
+          companyId,
+          contextId: msg.context.id,
+          buttonText: body
+        });
+      }
+
       if (body && (isButtonReply || mediaType === "chat")) {
         logger.info(
           `[EvoHub] possivel lead de campanha (ticket=${ticket.id}) type=${msg.type} botao=${isButtonReply} texto="${String(
