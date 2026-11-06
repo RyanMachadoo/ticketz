@@ -127,11 +127,55 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
   const [connections, setConnections] = useState([]);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [knowledgeDocs, setKnowledgeDocs] = useState([]);
+  const [knowledgeBusy, setKnowledgeBusy] = useState(false);
+
+  const loadKnowledge = async () => {
+    if (!agentId) return;
+    try {
+      const { data } = await api.get(`/ai-agents/${agentId}/knowledge`);
+      setKnowledgeDocs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // best-effort
+    }
+  };
+
+  const handleKnowledgeUpload = async e => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length || !agentId) return;
+    const fd = new FormData();
+    files.forEach(f => fd.append("file", f));
+    setKnowledgeBusy(true);
+    try {
+      await api.post(`/ai-agents/${agentId}/knowledge`, fd, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      await loadKnowledge();
+    } catch (err) {
+      toastError(err);
+    }
+    setKnowledgeBusy(false);
+  };
+
+  const handleKnowledgeDelete = async docId => {
+    if (!agentId) return;
+    setKnowledgeBusy(true);
+    try {
+      await api.delete(`/ai-agents/${agentId}/knowledge/${docId}`);
+      await loadKnowledge();
+    } catch (err) {
+      toastError(err);
+    }
+    setKnowledgeBusy(false);
+  };
 
   useEffect(() => {
     if (!open) return;
     setForm(defaultForm);
     setHasApiKey(false);
+    setKnowledgeDocs([]);
+    if (agentId) loadKnowledge();
 
     (async () => {
       try {
@@ -1145,6 +1189,87 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
             {i18n.t("aiAgents.modal.addEstoque")}
           </Button>
         </div>
+
+        <Divider className={classes.section} />
+        <Typography variant="subtitle1">
+          {i18n.t("aiAgents.modal.knowledgeTitle")}
+        </Typography>
+        <Typography
+          variant="body2"
+          color="textSecondary"
+          className={classes.hint}
+        >
+          {i18n.t("aiAgents.modal.knowledgeHint")}
+        </Typography>
+
+        {!agentId && (
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("aiAgents.modal.knowledgeSaveFirst")}
+          </Typography>
+        )}
+
+        {agentId && (
+          <>
+            {knowledgeDocs.map(doc => (
+              <Paper
+                variant="outlined"
+                className={classes.toolCard}
+                key={doc.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between"
+                }}
+              >
+                <div>
+                  <Typography variant="body2">
+                    <strong>{doc.title}</strong>
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary">
+                    {doc.chunkCount} {i18n.t("aiAgents.modal.knowledgeChunks")} ·{" "}
+                    {doc.charCount} {i18n.t("aiAgents.modal.knowledgeChars")}
+                  </Typography>
+                </div>
+                <Button
+                  size="small"
+                  color="secondary"
+                  disabled={knowledgeBusy}
+                  onClick={() => handleKnowledgeDelete(doc.id)}
+                >
+                  {i18n.t("aiAgents.modal.knowledgeRemove")}
+                </Button>
+              </Paper>
+            ))}
+            {!knowledgeDocs.length && (
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("aiAgents.modal.knowledgeEmpty")}
+              </Typography>
+            )}
+            <div style={{ marginTop: 8 }}>
+              <input
+                id="knowledge-file-input"
+                type="file"
+                accept=".txt,.md,.markdown,.csv"
+                multiple
+                style={{ display: "none" }}
+                onChange={handleKnowledgeUpload}
+              />
+              <label htmlFor="knowledge-file-input">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  component="span"
+                  startIcon={<AddCircleOutline />}
+                  disabled={knowledgeBusy}
+                >
+                  {knowledgeBusy
+                    ? i18n.t("aiAgents.modal.knowledgeUploading")
+                    : i18n.t("aiAgents.modal.knowledgeUpload")}
+                </Button>
+              </label>
+            </div>
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} color="secondary" disabled={saving}>

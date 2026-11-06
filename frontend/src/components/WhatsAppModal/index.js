@@ -90,6 +90,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     evohubToken: "",
     evohubPhoneNumberId: "",
     evohubWabaId: "",
+    // Agente de IA padrão desta conexão (primeiro contato / sem fila com IA).
+    defaultAiAgentId: "",
     // Rodízio de vendedores por conexão: aponta para um agente de IA (fallback).
     rodizioAgentId: "",
     // Roteamento próprio da conexão (fonte preferida).
@@ -116,6 +118,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
           evohubToken: data.evohubToken || "",
           evohubPhoneNumberId: data.evohubPhoneNumberId || "",
           evohubWabaId: data.evohubWabaId || "",
+          defaultAiAgentId: data.defaultAiAgentId ?? "",
           rodizioAgentId: data.rodizioAgentId ?? "",
           sellers: Array.isArray(data.sellers)
             ? data.sellers.map(s => ({
@@ -387,6 +390,27 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     )}
                   </Paper>
                 )}
+                <div>
+                  <Field
+                    as={TextField}
+                    select
+                    label={i18n.t("whatsappModal.form.defaultAgent")}
+                    name="defaultAiAgentId"
+                    fullWidth
+                    variant="outlined"
+                    margin="dense"
+                    helperText={i18n.t("whatsappModal.form.defaultAgentHelper")}
+                  >
+                    <MenuItem value="">
+                      {i18n.t("whatsappModal.form.defaultAgentNone")}
+                    </MenuItem>
+                    {agents.map(a => (
+                      <MenuItem key={a.id} value={a.id}>
+                        {a.name}
+                      </MenuItem>
+                    ))}
+                  </Field>
+                </div>
                 <div>
                   <Field
                     as={TextField}

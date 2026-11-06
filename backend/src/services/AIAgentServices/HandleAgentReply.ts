@@ -2,6 +2,7 @@ import AIAgent from "../../models/AIAgent";
 import Message from "../../models/Message";
 import Queue from "../../models/Queue";
 import Ticket from "../../models/Ticket";
+import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
 import ShowTicketService from "../TicketServices/ShowTicketService";
 import { getReferralForTicket } from "../CtwaServices/CtwaService";
@@ -26,6 +27,7 @@ import {
   loadMemory,
   formatMemoryForPrompt
 } from "./AgentMemoryService";
+import { countChunks } from "./AgentKnowledgeService";
 import {
   normalizeGuardrails,
   checkToolCall,
@@ -368,27 +370,40 @@ export async function handleAgentReply(
     const ticket = await Ticket.findByPk(ticketId);
     if (!ticket || ticket.companyId !== companyId) return;
     if (ticket.status === "closed") return;
-    // Controle é pela FILA: a IA atua enquanto o ticket estiver numa fila com
-    // agente. Sem fila ou fila sem agente → não atua.
-    if (!ticket.queueId) return;
 
-    const queue = await Queue.findByPk(ticket.queueId);
-    if (!queue || !queue.aiAgentId) return;
+    // Resolve o AGENTE: 1) fila com IA (controle clássico); senão 2) agente
+    // PADRÃO da conexão (primeiro contato / ticket sem fila com IA), que só atua
+    // quando NÃO há atendente humano no ticket.
+    let agentId: number | null = null;
+    let viaQueue = false;
+    if (ticket.queueId) {
+      const queue = await Queue.findByPk(ticket.queueId);
+      if (queue && queue.aiAgentId) {
+        agentId = queue.aiAgentId;
+        viaQueue = true;
+      }
+    }
+    if (!agentId && ticket.whatsappId && !ticket.userId) {
+      const conn = await Whatsapp.findByPk(ticket.whatsappId);
+      if (conn && conn.defaultAiAgentId) agentId = conn.defaultAiAgentId;
+    }
+    if (!agentId) return;
 
-    // Reativação: se o ticket voltou para uma fila COM IA depois de ter sido
-    // transferido (useAgent=false), religa o agente — estar numa fila de IA é o
-    // sinal de que a IA deve atender de novo. Guardamos o flag para começar a
-    // conversa do zero (ver buildConversation/freshStart): sem isso, o histórico
-    // ainda traria a despedida/transferência e o modelo responderia vazio.
-    const reactivated = ticket.useAgent === false;
+    // Reativação (recomeço limpo): só para o caso de FILA com IA — o retorno à
+    // fila da IA é um sinal deliberado. No caso do agente PADRÃO da conexão,
+    // useAgent=false significa que um humano assumiu → NÃO reativa (respeita o
+    // handoff) e não atua.
+    const reactivated = viaQueue && ticket.useAgent === false;
     if (reactivated) {
       await ticket.update({ useAgent: true });
       logger.info(
         `[Agente IA] ticket=${ticketId} voltou para fila com IA — agente reativado (recomeço limpo da conversa).`
       );
+    } else if (!viaQueue && ticket.useAgent === false) {
+      return;
     }
 
-    const agent = await AIAgent.findByPk(queue.aiAgentId);
+    const agent = await AIAgent.findByPk(agentId);
     if (!agent || !agent.isActive) return;
     if (!agent.apiKey) {
       logger.warn(
@@ -478,10 +493,19 @@ export async function handleAgentReply(
       .join("\n");
 
     const guardrails = normalizeGuardrails(agent.guardrails);
-    const tools = buildAnthropicTools(agent.tools || []);
+    // Base de conhecimento: só expõe a ferramenta de consulta se o agente tem
+    // conteúdo ingerido (evita o modelo chamar uma base vazia).
+    let hasKnowledge = false;
+    try {
+      hasKnowledge = (await countChunks(companyId, agent.id)) > 0;
+    } catch (e) {
+      // best-effort
+    }
+    const tools = buildAnthropicTools(agent.tools || [], { hasKnowledge });
     const ctx: AgentToolContext = {
       companyId,
       ticketId,
+      agentId: agent.id,
       contactId,
       contactName,
       contactNumber,

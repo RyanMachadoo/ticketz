@@ -1,5 +1,6 @@
 import Bull from "bull";
 import Message from "../models/Message";
+import Whatsapp from "../models/Whatsapp";
 import { logger } from "../utils/logger";
 import handleAgentReply from "../services/AIAgentServices/HandleAgentReply";
 
@@ -56,41 +57,55 @@ export function maybeEnqueueAgent(message: Message): void {
     const ticket: any = message.ticket;
     if (!ticket) return;
     if (ticket.isGroup) return;
+    if (ticket.status === "closed") return;
 
-    // Só faz sentido logar/decidir quando a FILA do ticket tem agente. Para
-    // tickets em filas sem agente, fica em silêncio (não é caso do agente).
     const queueHasAgent = !!(ticket.queue && ticket.queue.aiAgentId);
-    if (!queueHasAgent) return;
 
-    // A partir daqui a fila TEM agente: deixamos claro no log por que atua ou não.
-    if (ticket.status === "closed") {
-      logger.info(`[Agente IA] ticket=${ticket.id} NÃO atua: ticket fechado.`);
+    if (queueHasAgent) {
+      // Caso clássico: controle pela FILA. HandleAgentReply reativa useAgent se
+      // voltou para a fila da IA após transfer. Para parar, mova p/ fila sem IA.
+      enqueue(ticket, message.companyId, `fila=${ticket.queue.name || ticket.queueId}`);
       return;
     }
-    // Obs.: o controle é pela FILA. NÃO bloqueamos por userId nem por useAgent
-    // aqui: se o ticket está numa fila COM IA, enfileiramos. O HandleAgentReply
-    // reativa o agente (useAgent=true) caso o ticket tenha voltado para a fila
-    // da IA após um transfer. Para parar a IA, transfira para uma fila SEM IA.
 
-    // jobId por "janela de tempo": mensagens do mesmo intervalo colapsam num
-    // único job (debounce). Ao rodar, o handler lê todo o histórico.
-    const bucket = Math.floor(Date.now() / DEBOUNCE_MS);
-    logger.info(
-      `[Agente IA] ticket=${ticket.id} agendado (debounce ${DEBOUNCE_MS}ms, fila=${ticket.queue.name || ticket.queueId}, agenteId=${ticket.queue.aiAgentId}).`
-    );
-    agentQueue
-      .add(
-        { ticketId: ticket.id, companyId: message.companyId },
-        { jobId: `agent-${ticket.id}-${bucket}`, delay: DEBOUNCE_MS }
-      )
-      .catch(err => {
-        logger.error(
-          `[Agente IA] falha ao enfileirar ticket=${ticket.id}: ${err?.message}`
-        );
+    // Caso NOVO: agente PADRÃO da conexão. Atua no primeiro contato / tickets
+    // sem fila com IA, mas só quando NÃO há atendente humano (userId null) e a
+    // IA não foi desligada (useAgent !== false). Precisa carregar a conexão —
+    // faz async e enfileira no .then (continua fire-and-forget).
+    if (ticket.userId) return; // humano assumiu: não fala por cima
+    if (ticket.useAgent === false) return; // transferido: respeita o handoff
+    if (!ticket.whatsappId) return;
+
+    Whatsapp.findByPk(ticket.whatsappId)
+      .then(conn => {
+        if (conn && conn.defaultAiAgentId) {
+          enqueue(ticket, message.companyId, `conexão padrão agente=${conn.defaultAiAgentId}`);
+        }
+      })
+      .catch(() => {
+        /* best-effort */
       });
   } catch (err: any) {
     logger.error(`[Agente IA] maybeEnqueueAgent erro: ${err?.message}`);
   }
+}
+
+/** Enfileira o job do agente (debounce por janela de tempo). */
+function enqueue(ticket: any, companyId: number, origem: string): void {
+  const bucket = Math.floor(Date.now() / DEBOUNCE_MS);
+  logger.info(
+    `[Agente IA] ticket=${ticket.id} agendado (debounce ${DEBOUNCE_MS}ms, ${origem}).`
+  );
+  agentQueue
+    .add(
+      { ticketId: ticket.id, companyId },
+      { jobId: `agent-${ticket.id}-${bucket}`, delay: DEBOUNCE_MS }
+    )
+    .catch(err => {
+      logger.error(
+        `[Agente IA] falha ao enfileirar ticket=${ticket.id}: ${err?.message}`
+      );
+    });
 }
 
 logger.info("[Agente IA] fila de respostas registrada");

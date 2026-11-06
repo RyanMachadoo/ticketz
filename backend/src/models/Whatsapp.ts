@@ -181,6 +181,12 @@ class Whatsapp extends Model<Whatsapp> {
   @Column(DataType.STRING)
   usageOverridePeriod: string;
 
+  // Agente de IA PADRÃO desta conexão: atua no primeiro contato / tickets sem
+  // fila com IA (e sem atendente humano). Permite ter um agente por conexão,
+  // além do agente por fila. null = sem agente padrão na conexão.
+  @Column(DataType.INTEGER)
+  defaultAiAgentId: number;
+
   // ===== Rodízio de vendedores (por conexão) =====
   // Agente de IA cuja configuração de rodízio esta conexão usa como FALLBACK,
   // quando a própria conexão não tem pool configurado. Mantido por compat.

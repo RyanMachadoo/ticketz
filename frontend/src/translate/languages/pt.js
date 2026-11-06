@@ -365,6 +365,17 @@ const messages = {
           blockedKeywords: "Palavras bloqueadas no input",
           blockedKeywordsHint:
             "Bloqueia a ferramenta se o conteúdo tiver estas palavras. Separe por vírgula.",
+          knowledgeTitle: "Base de conhecimento",
+          knowledgeHint:
+            "Arquivos (.txt/.md/.csv) que o agente consulta antes de responder (FAQs, políticas, scripts, infos do setor). Cada agente tem sua própria base.",
+          knowledgeSaveFirst:
+            "Salve o agente primeiro para poder enviar arquivos à base.",
+          knowledgeEmpty: "Nenhum documento na base ainda.",
+          knowledgeChunks: "trechos",
+          knowledgeChars: "caracteres",
+          knowledgeRemove: "Remover",
+          knowledgeUpload: "Enviar arquivo (.txt/.md/.csv)",
+          knowledgeUploading: "Enviando...",
           toolsTitle: "Ferramentas",
           toolsHint:
             "Ferramentas que o agente pode acionar durante o atendimento. HTTP chama uma API, Webhook dispara uma automação (n8n), Transferir passa para um humano.",
@@ -597,6 +608,10 @@ const messages = {
           evohubWabaId: "WABA ID",
           rodizioAgent: "Agente do rodízio de vendedores",
           rodizioAgentAuto: "Automático (1º agente com vendedores)",
+          defaultAgent: "Agente de IA padrão desta conexão",
+          defaultAgentNone: "Nenhum (só por fila)",
+          defaultAgentHelper:
+            "Atua no primeiro contato e em tickets sem fila com IA (e sem atendente humano). Permite um agente por conexão, além do agente por fila.",
           rodizioAgentHelper:
             "Fallback: agente cuja config de rodízio é usada quando esta conexão não tem pool próprio abaixo.",
           routingTitle: "Rodízio e avisos (desta conexão)",

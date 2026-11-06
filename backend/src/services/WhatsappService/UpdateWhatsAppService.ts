@@ -26,6 +26,8 @@ export interface WhatsappData {
   evohubToken?: string;
   evohubPhoneNumberId?: string;
   evohubWabaId?: string;
+  // Agente de IA padrão da conexão (primeiro contato / sem fila com IA).
+  defaultAiAgentId?: number | null;
   // Rodízio de vendedores por conexão (aponta para um agente de IA — fallback).
   rodizioAgentId?: number | null;
   // Roteamento próprio da conexão.
@@ -92,6 +94,7 @@ const UpdateWhatsAppService = async ({
     evohubToken,
     evohubPhoneNumberId,
     evohubWabaId,
+    defaultAiAgentId,
     rodizioAgentId,
     sellers,
     notifyWhatsappId,
@@ -148,6 +151,10 @@ const UpdateWhatsAppService = async ({
     evohubToken,
     evohubPhoneNumberId,
     evohubWabaId,
+    // Agente padrão da conexão: normaliza "" / 0 para null.
+    ...(defaultAiAgentId !== undefined
+      ? { defaultAiAgentId: defaultAiAgentId ? Number(defaultAiAgentId) : null }
+      : {}),
     // Rodízio por conexão: normaliza "" / 0 para null.
     rodizioAgentId: rodizioAgentId ? Number(rodizioAgentId) : null,
     // Roteamento próprio da conexão.

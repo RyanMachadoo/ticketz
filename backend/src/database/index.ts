@@ -52,6 +52,8 @@ import AutomationStep from "../models/AutomationStep";
 import AutomationEnrollment from "../models/AutomationEnrollment";
 import AutomationTask from "../models/AutomationTask";
 import AutomationResponse from "../models/AutomationResponse";
+import AgentKnowledgeDoc from "../models/AgentKnowledgeDoc";
+import AgentKnowledgeChunk from "../models/AgentKnowledgeChunk";
 
 const dbConfig = require("../config/database");
 
@@ -116,7 +118,9 @@ const models = [
   AutomationStep,
   AutomationEnrollment,
   AutomationTask,
-  AutomationResponse
+  AutomationResponse,
+  AgentKnowledgeDoc,
+  AgentKnowledgeChunk
 ];
 
 sequelize.addModels(models);

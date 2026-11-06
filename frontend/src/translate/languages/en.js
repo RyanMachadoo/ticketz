@@ -366,6 +366,16 @@ const messages = {
           blockedKeywords: "Blocked keywords in input",
           blockedKeywordsHint:
             "Blocks the tool if the content contains these words. Comma-separated.",
+          knowledgeTitle: "Knowledge base",
+          knowledgeHint:
+            "Files (.txt/.md/.csv) the agent checks before answering (FAQs, policies, scripts, sector info). Each agent has its own base.",
+          knowledgeSaveFirst: "Save the agent first to upload files to its base.",
+          knowledgeEmpty: "No documents in the base yet.",
+          knowledgeChunks: "chunks",
+          knowledgeChars: "chars",
+          knowledgeRemove: "Remove",
+          knowledgeUpload: "Upload file (.txt/.md/.csv)",
+          knowledgeUploading: "Uploading...",
           toolsTitle: "Tools",
           toolsHint:
             "Tools the agent can trigger. HTTP calls an API, Webhook fires an automation (n8n), Transfer hands off to a human.",
@@ -596,6 +606,10 @@ const messages = {
           evohubWabaId: "WABA ID",
           rodizioAgent: "Seller round-robin agent",
           rodizioAgentAuto: "Automatic (first agent with sellers)",
+          defaultAgent: "Default AI agent for this connection",
+          defaultAgentNone: "None (queue only)",
+          defaultAgentHelper:
+            "Acts on first contact and tickets with no AI queue (and no human agent). Lets you have one agent per connection, besides the per-queue agent.",
           rodizioAgentHelper:
             "Fallback: agent whose round-robin config is used when this connection has no own pool below.",
           routingTitle: "Round-robin & alerts (this connection)",

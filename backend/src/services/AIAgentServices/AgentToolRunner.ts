@@ -22,6 +22,7 @@ import {
   HandoffResult,
   resolveSellerAgent
 } from "./AgentSellerService";
+import { searchKnowledge } from "./AgentKnowledgeService";
 
 export const HUMAN_QUEUE_NAME = "Atendimento Humano";
 
@@ -105,6 +106,7 @@ export async function getOrCreateHumanQueue(
 const TRANSFER_TOOL_NAME = "transferir_atendimento";
 export const MEMORY_TOOL_NAME = "anotar_memoria";
 export const ESTOQUE_TOOL_NAME = "consultar_estoque";
+export const KNOWLEDGE_TOOL_NAME = "consultar_base";
 
 /**
  * A Anthropic exige nome de ferramenta no padrão ^[a-zA-Z0-9_-]{1,128}$.
@@ -203,6 +205,26 @@ function memoryToolDef(): AnthropicTool {
   };
 }
 
+/** Definição da ferramenta nativa de consulta à base de conhecimento. */
+function knowledgeToolDef(): AnthropicTool {
+  return {
+    name: KNOWLEDGE_TOOL_NAME,
+    description:
+      "Consulta a BASE DE CONHECIMENTO do setor (FAQs, políticas, scripts, informações internas). Use SEMPRE que o cliente perguntar algo sobre regras, condições, procedimentos, prazos, documentos, horários ou detalhes que não sejam estoque/preço de veículo. Faça uma pergunta objetiva com as palavras-chave. Responda ao cliente SÓ com o que vier da base; se não vier nada, diga que vai verificar ou transfira.",
+    input_schema: {
+      type: "object",
+      properties: {
+        pergunta: {
+          type: "string",
+          description:
+            "A dúvida a pesquisar na base, com palavras-chave (ex.: 'documentos para financiamento', 'prazo de entrega do emplacamento')."
+        }
+      },
+      required: ["pergunta"]
+    }
+  };
+}
+
 /** Definição da ferramenta nativa de consulta de estoque (formato Anthropic). */
 function estoqueToolDef(description?: string): AnthropicTool {
   return {
@@ -257,7 +279,10 @@ function estoqueToolDef(description?: string): AnthropicTool {
  * passar para um humano e registrar o que aprendeu. A de estoque só entra
  * quando o admin adiciona uma ferramenta do tipo "estoque" (opt-in).
  */
-export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
+export function buildAnthropicTools(
+  tools: any[],
+  opts?: { hasKnowledge?: boolean }
+): AnthropicTool[] {
   const result: AnthropicTool[] = [];
   let hasTransfer = false;
   let hasEstoque = false;
@@ -291,6 +316,10 @@ export function buildAnthropicTools(tools: any[]): AnthropicTool[] {
   }
   // memória nativa sempre disponível
   result.push(memoryToolDef());
+  // consulta à base de conhecimento: só quando o agente tem conteúdo ingerido.
+  if (opts?.hasKnowledge) {
+    result.push(knowledgeToolDef());
+  }
   return result;
 }
 
@@ -327,6 +356,7 @@ function buildVars(input: any, ctx: AgentToolContext): Record<string, any> {
 export interface AgentToolContext {
   companyId: number;
   ticketId: number;
+  agentId?: number | null;
   contactId?: number | null;
   contactName: string;
   contactNumber: string;
@@ -343,6 +373,35 @@ const MAX_RESULT_CHARS = 4000;
 
 const truncate = (s: string): string =>
   s && s.length > MAX_RESULT_CHARS ? `${s.slice(0, MAX_RESULT_CHARS)}…` : s;
+
+/** Consulta a base de conhecimento do agente (full-text) e devolve os trechos. */
+async function executeKnowledge(
+  input: any,
+  ctx: AgentToolContext
+): Promise<ToolExecutionResult> {
+  const pergunta = String(input?.pergunta || "").trim();
+  if (!pergunta) {
+    return { content: "Informe uma pergunta para consultar a base." };
+  }
+  if (!ctx.agentId) {
+    return { content: "Base de conhecimento indisponível para este agente." };
+  }
+  const hits = await searchKnowledge(ctx.companyId, ctx.agentId, pergunta, 4);
+  if (!hits.length) {
+    return {
+      content:
+        "Nada encontrado na base sobre isso. Não invente — diga que vai verificar ou transfira para um humano."
+    };
+  }
+  const texto = hits
+    .map((h, i) => `[Trecho ${i + 1}]\n${h.content}`)
+    .join("\n\n");
+  return {
+    content: truncate(
+      `Base de conhecimento (use SÓ estas informações para responder):\n\n${texto}`
+    )
+  };
+}
 
 /** Executa UMA ferramenta pedida pelo modelo e devolve o resultado em texto. */
 export async function executeTool(
@@ -371,6 +430,11 @@ export async function executeTool(
   if (toolName === ESTOQUE_TOOL_NAME) {
     const estoqueDef = (agentTools || []).find(t => t?.kind === "estoque");
     return executeEstoque(estoqueDef, input);
+  }
+
+  // Base de conhecimento (nativa): busca full-text nos trechos do agente.
+  if (toolName === KNOWLEDGE_TOOL_NAME) {
+    return executeKnowledge(input, ctx);
   }
 
   // Casa pelo nome sanitizado (o modelo devolve o nome já sanitizado).
