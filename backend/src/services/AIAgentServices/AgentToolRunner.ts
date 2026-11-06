@@ -381,16 +381,23 @@ async function executeKnowledge(
 ): Promise<ToolExecutionResult> {
   const pergunta = String(input?.pergunta || "").trim();
   if (!pergunta) {
-    return { content: "Informe uma pergunta para consultar a base." };
+    return {
+      content: "Informe uma pergunta para consultar a base.",
+      isError: true
+    };
   }
   if (!ctx.agentId) {
-    return { content: "Base de conhecimento indisponível para este agente." };
+    return {
+      content: "Base de conhecimento indisponível para este agente.",
+      isError: true
+    };
   }
   const hits = await searchKnowledge(ctx.companyId, ctx.agentId, pergunta, 4);
   if (!hits.length) {
     return {
       content:
-        "Nada encontrado na base sobre isso. Não invente — diga que vai verificar ou transfira para um humano."
+        "Nada encontrado na base sobre isso. Não invente — diga que vai verificar ou transfira para um humano.",
+      isError: false
     };
   }
   const texto = hits
@@ -399,7 +406,8 @@ async function executeKnowledge(
   return {
     content: truncate(
       `Base de conhecimento (use SÓ estas informações para responder):\n\n${texto}`
-    )
+    ),
+    isError: false
   };
 }
 
