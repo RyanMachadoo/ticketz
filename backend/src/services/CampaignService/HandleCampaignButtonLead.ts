@@ -1,6 +1,9 @@
 import { GetCompanySetting } from "../../helpers/CheckSettings";
 import { transferTicketToHuman } from "../AIAgentServices/AgentToolRunner";
-import { resolveSellerAgent } from "../AIAgentServices/AgentSellerService";
+import {
+  resolveSellerAgent,
+  activeSellersOf
+} from "../AIAgentServices/AgentSellerService";
 import Whatsapp from "../../models/Whatsapp";
 import AIAgent from "../../models/AIAgent";
 import { logger } from "../../utils/logger";
@@ -78,50 +81,48 @@ export async function handleCampaignButtonLead(params: {
       return false;
     }
 
-    // Agente do rodízio: 1) o configurado NA CONEXÃO (rodizioAgentId); senão
-    // 2) o 1º agente com vendedores da empresa. Usado para a fila de destino e
-    // repassado ao handoff (que respeita o agentId explícito).
+    // Pool de vendedores: 1) o da CONEXÃO onde a resposta chegou (roteamento
+    // atual); senão 2) o de um agente (rodizioAgentId da conexão ou o 1º agente
+    // com vendedores). O agente é opcional quando a conexão já tem vendedores.
+    const connection = whatsappId ? await Whatsapp.findByPk(whatsappId) : null;
+    const connSellers = activeSellersOf(connection).length;
+
     let agent: AIAgent | null = null;
     let origem = "auto";
-    if (whatsappId) {
-      const connection = await Whatsapp.findByPk(whatsappId);
-      if (connection?.rodizioAgentId) {
-        agent = await AIAgent.findByPk(connection.rodizioAgentId);
-        if (agent) origem = `conexão(${whatsappId})->agente ${agent.id}`;
-      }
+    if (connection?.rodizioAgentId) {
+      agent = await AIAgent.findByPk(connection.rodizioAgentId);
+      if (agent) origem = `conexão(${whatsappId})->agente ${agent.id}`;
     }
-    if (!agent) {
+    if (!agent && !connSellers) {
       agent = await resolveSellerAgent(companyId);
       if (agent) origem = `auto->agente ${agent.id}`;
     }
 
-    if (!agent) {
-      logger.warn(
-        `[Campanha][rodízio] NENHUM agente de rodízio encontrado (ticket=${ticketId}, conexão=${whatsappId}). Configure um agente com vendedores ou aponte o "Agente do rodízio" na conexão.`
-      );
-      return false;
-    }
+    const agentSellers = agent ? activeSellersOf(agent).length : 0;
+    const nSellers = connSellers || agentSellers;
+    const fonte = connSellers
+      ? `conexão ${whatsappId}`
+      : agent
+      ? `agente ${agent.id}`
+      : "nenhuma";
 
-    const nSellers = Array.isArray(agent.sellers) ? agent.sellers.length : 0;
     logger.info(
-      `[Campanha][rodízio] botão "${btn}" (ticket=${ticketId}) -> ${origem}, vendedores=${nSellers}, aviso via conexão=${
-        agent.sellerNotifyWhatsappId || "padrão"
-      }.`
+      `[Campanha][rodízio] botão "${btn}" (ticket=${ticketId}) -> pool=${fonte} (${origem}), vendedores ativos=${nSellers}.`
     );
     if (!nSellers) {
       logger.warn(
-        `[Campanha][rodízio] agente ${agent.id} SEM vendedores configurados (ticket=${ticketId}); nada a enviar.`
+        `[Campanha][rodízio] SEM vendedores ativos (ticket=${ticketId}, conexão=${whatsappId}). Cadastre os vendedores na conexão (Roteamento) e marque-os como ativos.`
       );
       return false;
     }
 
-    const transferQueueId = agent.transferQueueId || null;
+    const transferQueueId = agent?.transferQueueId || null;
 
     const result = await transferTicketToHuman({
       companyId,
       ticketId,
       transferQueueId,
-      agentId: agent.id,
+      agentId: agent?.id || null,
       motivo: `Lead de campanha — o cliente tocou em "${btn}".`
     });
 

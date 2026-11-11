@@ -462,6 +462,20 @@ export async function handleAgentReply(
     const baseMessages: AnthropicMessage[] = messages.slice();
 
     // Data/hora atual, para o agente interpretar "ontem", "semana passada" etc.
+    // Ferramentas que o agente realmente tem — as regras fixas só citam o que
+    // existe para ESTE agente (evita mandar o agente de Oficina usar estoque).
+    const hasEstoqueTool = (agent.tools || []).some(
+      (t: any) => t && t.kind === "estoque"
+    );
+    // Base de conhecimento: só expõe a ferramenta de consulta se o agente tem
+    // conteúdo ingerido (evita o modelo chamar uma base vazia).
+    let hasKnowledge = false;
+    try {
+      hasKnowledge = (await countChunks(companyId, agent.id)) > 0;
+    } catch (e) {
+      // best-effort
+    }
+
     const dateLine = `Data e hora atuais: ${nowInTimezone()} (horário de Brasília). Use isto como "hoje" ao interpretar o cliente (ex.: "ontem", "semana passada") — nunca assuma que ainda é a data da última conversa.`;
 
     // Retomada após intervalo longo: recomeçar o assunto sem citar o passado.
@@ -480,27 +494,26 @@ export async function handleAgentReply(
       resumoLine,
       memoryLine,
       formatCampaigns(agent.campaigns),
+      // Regras UNIVERSAIS (valem para qualquer setor). Regras de negócio de
+      // cada setor (marcas, quando transferir, objeções) ficam no prompt do
+      // agente, para não conflitar entre Vendas, Oficina, Peças etc.
       "REGRAS FIXAS:",
       "• SEMPRE responda ao cliente em texto no mesmo turno — nunca termine só chamando ferramentas.",
       "• Seja objetivo e econômico: 2 a 4 frases curtas, uma pergunta por vez, sem repetir o que já foi dito (cada mensagem tem custo).",
-      "• Modelos/preço/ano/km/cores: consulte consultar_estoque ANTES e responda só com o retorno dela; nunca invente.",
-      "• 0km (carros novos): trabalhamos SOMENTE com Volkswagen. Seminovos/usados: a Francauto vende MULTIMARCAS — fique aberto a qualquer marca, não empurre VW no usado.",
-      "• Memória (anotar_memoria): no máximo uma anotação curta por resposta, só de fato novo e útil, e ainda assim responda ao cliente no mesmo turno.",
-      "• Transfira para um humano quando o cliente agendar visita, quiser negociar/fechar, pedir uma pessoa, ou quando você não puder resolver.",
+      "• NUNCA invente informações (preços, prazos, regras, condições). Use as ferramentas disponíveis e, se elas não trouxerem a resposta, diga que vai verificar ou transfira para um humano.",
+      hasEstoqueTool
+        ? "• Veículos (modelos/preço/ano/km/cores/disponibilidade): consulte consultar_estoque ANTES e responda só com o retorno dela."
+        : "",
+      hasKnowledge
+        ? "• Regras, condições, prazos, documentos, horários e procedimentos: consulte consultar_base ANTES e responda só com o que vier dela."
+        : "",
+      "• Memória (anotar_memoria): no máximo uma anotação curta por resposta, só de fato novo e útil, sem dados sensíveis; e ainda assim responda ao cliente no mesmo turno.",
       "• Responda em português do Brasil."
     ]
       .filter(Boolean)
       .join("\n");
 
     const guardrails = normalizeGuardrails(agent.guardrails);
-    // Base de conhecimento: só expõe a ferramenta de consulta se o agente tem
-    // conteúdo ingerido (evita o modelo chamar uma base vazia).
-    let hasKnowledge = false;
-    try {
-      hasKnowledge = (await countChunks(companyId, agent.id)) > 0;
-    } catch (e) {
-      // best-effort
-    }
     const tools = buildAnthropicTools(agent.tools || [], { hasKnowledge });
     const ctx: AgentToolContext = {
       companyId,

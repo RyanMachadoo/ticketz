@@ -121,9 +121,38 @@ export interface KnowledgeHit {
   rank: number;
 }
 
+/** Executa a busca com uma expressão tsquery (montada no SQL a partir de :q). */
+async function runSearch(
+  tsqueryExpr: string,
+  q: string,
+  companyId: number,
+  agentId: number,
+  k: number
+): Promise<KnowledgeHit[]> {
+  const rows: any[] = await sequelize.query(
+    `SELECT "content", ts_rank("tsv", ${tsqueryExpr}) AS rank
+       FROM "AgentKnowledgeChunks"
+      WHERE "companyId" = :companyId
+        AND "agentId" = :agentId
+        AND "tsv" @@ ${tsqueryExpr}
+      ORDER BY rank DESC
+      LIMIT :k`,
+    {
+      replacements: { q, companyId, agentId, k },
+      type: QueryTypes.SELECT
+    }
+  );
+  return rows.map(r => ({ content: r.content, rank: Number(r.rank) }));
+}
+
 /**
  * Busca full-text (Postgres, português) os trechos mais relevantes da base do
- * agente para uma pergunta. Usa plainto_tsquery (tolerante a frase livre).
+ * agente para uma pergunta, em duas etapas:
+ *  1) TODAS as palavras no mesmo trecho (plainto_tsquery) — mais precisa;
+ *  2) se nada vier, QUALQUER uma das palavras (websearch_to_tsquery com "or"),
+ *     ordenando pela relevância — evita "nada encontrado" só porque a pergunta
+ *     usou uma palavra que não está no texto (ex.: "necessários").
+ * As duas funções do Postgres nunca dão erro de sintaxe com texto livre.
  */
 export async function searchKnowledge(
   companyId: number,
@@ -134,20 +163,29 @@ export async function searchKnowledge(
   const q = String(query || "").trim();
   if (!q) return [];
   try {
-    const rows: any[] = await sequelize.query(
-      `SELECT "content", ts_rank("tsv", plainto_tsquery('portuguese', :q)) AS rank
-         FROM "AgentKnowledgeChunks"
-        WHERE "companyId" = :companyId
-          AND "agentId" = :agentId
-          AND "tsv" @@ plainto_tsquery('portuguese', :q)
-        ORDER BY rank DESC
-        LIMIT :k`,
-      {
-        replacements: { q, companyId, agentId, k },
-        type: QueryTypes.SELECT
-      }
+    const exact = await runSearch(
+      "plainto_tsquery('portuguese', :q)",
+      q,
+      companyId,
+      agentId,
+      k
     );
-    return rows.map(r => ({ content: r.content, rank: Number(r.rank) }));
+    if (exact.length) return exact;
+
+    // Fallback: palavras com 3+ letras, unidas por "or".
+    const words = q
+      .toLowerCase()
+      .split(/[^a-zà-ÿ0-9]+/i)
+      .filter(w => w.length >= 3)
+      .slice(0, 10);
+    if (!words.length) return [];
+    return await runSearch(
+      "websearch_to_tsquery('portuguese', :q)",
+      words.join(" or "),
+      companyId,
+      agentId,
+      k
+    );
   } catch (err: any) {
     logger.error(`[Conhecimento] falha na busca (agente ${agentId}): ${err?.message}`);
     return [];

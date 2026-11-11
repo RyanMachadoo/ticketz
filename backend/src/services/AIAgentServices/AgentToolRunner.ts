@@ -657,18 +657,17 @@ export async function transferTicketToHuman(params: {
   }
 
   // Rodízio: avisa um vendedor no WhatsApp dele com o contexto do lead.
-  let seller: HandoffResult | null = null;
-  if (agent) {
-    seller = await handoffToSeller({
-      agent,
-      companyId,
-      contactName: fullTicket?.contact?.name || "",
-      contactNumber: fullTicket?.contact?.number || "",
-      motivo,
-      preference: sellerPreference,
-      whatsappId: ticket.whatsappId || fullTicket?.whatsappId
-    });
-  }
+  // O pool vem da CONEXÃO do ticket (agente é só fallback), então avisa o
+  // vendedor mesmo quando não há agente resolvido.
+  const seller: HandoffResult | null = await handoffToSeller({
+    agent,
+    companyId,
+    contactName: fullTicket?.contact?.name || "",
+    contactNumber: fullTicket?.contact?.number || "",
+    motivo,
+    preference: sellerPreference,
+    whatsappId: ticket.whatsappId || fullTicket?.whatsappId
+  });
 
   logger.info(
     `[Agente IA] TRANSFERIDO ticket=${ticketId} -> fila=${

@@ -42,7 +42,9 @@ function normalizeSellers(list: any[]): SellerConfig[] {
 }
 
 /** Vendedores ativos de um "holder" (conexão ou agente) que tenha .sellers. */
-function activeSellersOf(holder: { sellers?: any[] } | null): SellerConfig[] {
+export function activeSellersOf(
+  holder: { sellers?: any[] } | null
+): SellerConfig[] {
   return normalizeSellers(holder?.sellers || []);
 }
 
