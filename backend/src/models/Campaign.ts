@@ -73,6 +73,11 @@ class Campaign extends Model<Campaign> {
   @Column(DataType.JSON)
   templateParams: string[];
 
+  // Rótulos dos botões (resposta rápida) que mandam o lead DIRETO para o
+  // rodízio de vendedores. null = usa a configuração geral; [] = nenhum.
+  @Column(DataType.JSONB)
+  sellerButtons: string[] | null;
+
   @Column
   confirmation: boolean;
 

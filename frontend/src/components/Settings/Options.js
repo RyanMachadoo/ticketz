@@ -139,6 +139,7 @@ export default function Options(props) {
   const [tagsMode, setTagsMode] = useState("ticket");
   const [ticketAcceptedMessage, setTicketAcceptedMessage] = useState("");
   const [transferMessage, setTransferMessage] = useState("");
+  const [campaignSellerButtons, setCampaignSellerButtons] = useState("");
 
   const { getCurrentUserInfo } = useAuth();
   const [currentUser, setCurrentUser] = useState({});
@@ -320,6 +321,11 @@ export default function Options(props) {
 
       const transferMessage = settings.find(s => s.key === "transferMessage");
       setTransferMessage(transferMessage?.value || "");
+
+      const campaignSellerButtons = settings.find(
+        s => s.key === "campaignSellerButtons"
+      );
+      setCampaignSellerButtons(campaignSellerButtons?.value || "");
 
       const extensionDownloadUrl = settings.find(
         s => s.key === "extensionDownloadUrl"
@@ -687,6 +693,25 @@ export default function Options(props) {
               {i18n.t("settings.mustacheVariables.title")}{" "}
               {"{{firstname}} {{name}} {{user}} {{queue}}"}
             </span>
+          </FormControl>
+        </Grid>
+
+        <Grid xs={12} sm={12} md={6} item>
+          <FormControl className={classes.selectContainer}>
+            <TextField
+              id="campaign-seller-buttons-field"
+              label={i18n.t("settings.campaignSellerButtons.title")}
+              placeholder={i18n.t("settings.campaignSellerButtons.placeholder")}
+              helperText={i18n.t("settings.campaignSellerButtons.helper")}
+              variant="standard"
+              value={campaignSellerButtons}
+              onChange={e => {
+                setCampaignSellerButtons(e.target.value);
+              }}
+              onBlur={e => {
+                handleSetting("campaignSellerButtons", campaignSellerButtons);
+              }}
+            />
           </FormControl>
         </Grid>
 

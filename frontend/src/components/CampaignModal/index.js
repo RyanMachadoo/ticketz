@@ -25,7 +25,9 @@ import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import {
   Box,
+  Checkbox,
   FormControl,
+  FormControlLabel,
   Grid,
   InputLabel,
   MenuItem,
@@ -79,6 +81,23 @@ const CampaignSchema = Yup.object().shape({
 // Definida em escopo de módulo (não dentro do CampaignModal) para manter a
 // identidade estável entre renders — assim o estado local (templates carregados)
 // e o foco dos inputs não se perdem a cada tecla digitada.
+// Botões de resposta rápida (QUICK_REPLY) de um template da Meta.
+const quickReplyButtons = tmpl => {
+  const comps = Array.isArray(tmpl?.components) ? tmpl.components : [];
+  const block = comps.find(c => String(c?.type).toUpperCase() === "BUTTONS");
+  return (Array.isArray(block?.buttons) ? block.buttons : [])
+    .filter(b => String(b?.type).toUpperCase() === "QUICK_REPLY" && b?.text)
+    .map(b => String(b.text));
+};
+
+const sameButton = (a, b) =>
+  String(a || "")
+    .trim()
+    .toLowerCase() ===
+  String(b || "")
+    .trim()
+    .toLowerCase();
+
 const TemplateSection = ({ values, setFieldValue, disabled }) => {
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -119,6 +138,33 @@ const TemplateSection = ({ values, setFieldValue, disabled }) => {
         t.language === values.templateLanguage
     ) || templates.find(t => t.name === values.templateName);
 
+  const templateButtons = quickReplyButtons(selectedTemplate);
+
+  // Campanha sem configuração própria (antiga): ao abrir com o template
+  // carregado, assume "todos os botões vão para o rodízio" (o que é exibido).
+  useEffect(() => {
+    if (
+      !disabled &&
+      templateButtons.length &&
+      !Array.isArray(values.sellerButtons)
+    ) {
+      setFieldValue("sellerButtons", templateButtons);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateButtons.join("|"), disabled]);
+
+  const isSellerButton = text =>
+    !Array.isArray(values.sellerButtons) ||
+    values.sellerButtons.some(b => sameButton(b, text));
+
+  const toggleSellerButton = (text, checked) => {
+    const current = Array.isArray(values.sellerButtons)
+      ? values.sellerButtons
+      : templateButtons;
+    const rest = current.filter(b => !sameButton(b, text));
+    setFieldValue("sellerButtons", checked ? [...rest, text] : rest);
+  };
+
   const varCount = selectedTemplate
     ? selectedTemplate.variablesCount
     : Array.isArray(values.templateParams)
@@ -138,6 +184,8 @@ const TemplateSection = ({ values, setFieldValue, disabled }) => {
     setFieldValue("templateName", name);
     setFieldValue("templateLanguage", language);
     setFieldValue("templateParams", next);
+    // Padrão: todos os botões do template vão direto para o rodízio.
+    setFieldValue("sellerButtons", quickReplyButtons(tmpl));
   };
 
   return (
@@ -234,6 +282,38 @@ const TemplateSection = ({ values, setFieldValue, disabled }) => {
             ))}
           </Grid>
         )}
+
+        {templateButtons.length > 0 && (
+          <Box style={{ marginTop: 12 }}>
+            <Typography variant="subtitle2">
+              {i18n.t("campaigns.dialog.form.sellerButtonsTitle")}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              display="block"
+            >
+              {i18n.t("campaigns.dialog.form.sellerButtonsHint")}
+            </Typography>
+            {templateButtons.map(text => (
+              <FormControlLabel
+                key={`sellerbtn-${text}`}
+                style={{ display: "flex" }}
+                control={
+                  <Checkbox
+                    color="primary"
+                    checked={isSellerButton(text)}
+                    onChange={e => toggleSellerButton(text, e.target.checked)}
+                    disabled={disabled}
+                  />
+                }
+                label={`"${text}" — ${i18n.t(
+                  "campaigns.dialog.form.sellerButtonsGoes"
+                )}`}
+              />
+            ))}
+          </Box>
+        )}
       </Box>
     </Grid>
   );
@@ -273,6 +353,7 @@ const CampaignModal = ({
     templateName: "",
     templateLanguage: "",
     templateParams: [],
+    sellerButtons: "",
     companyId
   };
 

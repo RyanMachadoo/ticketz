@@ -1122,7 +1122,11 @@ const messages = {
             templateRequired:
               "Selecione um template aprovado para disparar nesta conexão oficial.",
             templateImageHint:
-              "Se o template tiver cabeçalho de imagem, anexe a imagem na campanha — ela é enviada no header do template."
+              "Se o template tiver cabeçalho de imagem, anexe a imagem na campanha — ela é enviada no header do template.",
+            sellerButtonsTitle: "Ao tocar no botão",
+            sellerButtonsHint:
+              "Marcado: o lead vai direto para o vendedor da vez (rodízio da conexão). Desmarcado: a IA/fila atende normalmente.",
+            sellerButtonsGoes: "vai direto para o rodízio de vendedores"
           },
           buttons: {
             add: "Adicionar",
@@ -1485,6 +1489,12 @@ const messages = {
         transferMessage: {
           title: "Mensagem de transferência",
           placeholder: "Digite sua mensagem de transferência aqui"
+        },
+        campaignSellerButtons: {
+          title: "Botões de campanha que vão direto ao rodízio",
+          placeholder: "Ex.: APROVEITAR AGORA, FALAR COM VENDEDOR",
+          helper:
+            "Separe por vírgula. Quando o cliente toca (ou escreve) um destes botões, o lead vai direto para o vendedor da vez. Vazio: qualquer botão de campanha dispara."
         },
         mustacheVariables: {
           title: "Variáveis disponíveis:"

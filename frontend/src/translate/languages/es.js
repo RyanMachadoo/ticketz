@@ -1125,7 +1125,11 @@ const messages = {
             templateRequired:
               "Selecciona una plantilla aprobada para enviar en esta conexión oficial.",
             templateImageHint:
-              "Si la plantilla tiene encabezado de imagen, adjunta la imagen a la campaña — se envía en el encabezado de la plantilla."
+              "Si la plantilla tiene encabezado de imagen, adjunta la imagen a la campaña — se envía en el encabezado de la plantilla.",
+            sellerButtonsTitle: "Al tocar el botón",
+            sellerButtonsHint:
+              "Marcado: el lead va directo al vendedor de turno (rotación de la conexión). Desmarcado: la IA/cola atiende normalmente.",
+            sellerButtonsGoes: "va directo a la rotación de vendedores"
           },
           buttons: {
             add: "Agregar",
@@ -1489,6 +1493,12 @@ const messages = {
         transferMessage: {
           title: "Mensaje de transferencia",
           placeholder: "Ingrese su mensaje de transferencia aquí"
+        },
+        campaignSellerButtons: {
+          title: "Botones de campaña que van directo a la rotación",
+          placeholder: "Ej.: APROVECHAR AHORA, HABLAR CON VENDEDOR",
+          helper:
+            "Separe con comas. Cuando el cliente toca (o escribe) uno de estos botones, el lead va directo al vendedor de turno. Vacío: cualquier botón de campaña dispara."
         },
         mustacheVariables: {
           title: "Variables disponibles:"

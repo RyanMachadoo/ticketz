@@ -26,7 +26,14 @@ interface Data {
   templateName?: string;
   templateLanguage?: string;
   templateParams?: string[];
+  sellerButtons?: string[] | null;
 }
+
+/** Normaliza a lista de botões do rodízio: array de textos ou null. */
+const sanitizeSellerButtons = (v: any): string[] | null => {
+  if (!Array.isArray(v)) return null;
+  return v.map(x => String(x || "").trim()).filter(Boolean);
+};
 
 const UpdateService = async (data: Data): Promise<Campaign> => {
   const { id } = data;
@@ -53,6 +60,10 @@ const UpdateService = async (data: Data): Promise<Campaign> => {
     data.whatsappId ?? record.whatsappId,
     data.templateName ?? record.templateName
   );
+
+  if ("sellerButtons" in data) {
+    data.sellerButtons = sanitizeSellerButtons(data.sellerButtons);
+  }
 
   await record.update(data);
 

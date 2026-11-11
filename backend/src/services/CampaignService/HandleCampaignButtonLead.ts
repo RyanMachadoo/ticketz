@@ -6,6 +6,10 @@ import {
 } from "../AIAgentServices/AgentSellerService";
 import Whatsapp from "../../models/Whatsapp";
 import AIAgent from "../../models/AIAgent";
+import { Op } from "sequelize";
+import Campaign from "../../models/Campaign";
+import CampaignShipping from "../../models/CampaignShipping";
+import normalizePhone from "../../helpers/NormalizePhone";
 import { logger } from "../../utils/logger";
 
 /**
@@ -34,12 +38,68 @@ const stripAccents = (s: string): string =>
 const norm = (s: string): string =>
   stripAccents(String(s || "")).toLowerCase().trim();
 
+const CAMPAIGN_LOOKBACK_DAYS = 7;
+
+/**
+ * Descobre de qual CAMPANHA veio a resposta:
+ *  1) pelo context.id (wamid da mensagem da campanha que o cliente respondeu —
+ *     é o que vem num toque de botão);
+ *  2) senão, pela última campanha enviada a este número nesta conexão nos
+ *     últimos dias (quando o toque chega como texto, sem contexto).
+ */
+async function resolveCampaign(params: {
+  companyId: number;
+  whatsappId?: number;
+  contextId?: string;
+  contactNumber?: string;
+}): Promise<{ campaign: Campaign | null; via: string }> {
+  const { companyId, whatsappId, contextId, contactNumber } = params;
+  try {
+    if (contextId) {
+      const shipping = await CampaignShipping.findOne({
+        where: { wamid: contextId },
+        include: [{ model: Campaign, where: { companyId }, required: true }]
+      });
+      if (shipping?.campaign) {
+        return { campaign: shipping.campaign, via: "contexto(wamid)" };
+      }
+    }
+    if (contactNumber) {
+      const number = normalizePhone(contactNumber).phone;
+      const since = new Date(
+        Date.now() - CAMPAIGN_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+      );
+      const shipping = await CampaignShipping.findOne({
+        where: { number, createdAt: { [Op.gte]: since } },
+        include: [
+          {
+            model: Campaign,
+            where: whatsappId ? { companyId, whatsappId } : { companyId },
+            required: true
+          }
+        ],
+        order: [["createdAt", "DESC"]]
+      });
+      if (shipping?.campaign) {
+        return { campaign: shipping.campaign, via: "último envio ao número" };
+      }
+    }
+  } catch (err: any) {
+    logger.warn(
+      `[Campanha][rodízio] não foi possível identificar a campanha: ${err?.message}`
+    );
+  }
+  return { campaign: null, via: "-" };
+}
+
 export async function handleCampaignButtonLead(params: {
   companyId: number;
   ticketId: number;
   buttonText: string;
   whatsappId?: number; // conexão onde a resposta chegou (aponta pro agente do rodízio)
   isButton?: boolean; // true = toque em botão; false = mensagem de texto
+  contextId?: string; // wamid da mensagem respondida (identifica a campanha)
+  contactNumber?: string; // número do cliente (fallback p/ achar a campanha)
 }): Promise<boolean> {
   const { companyId, ticketId, whatsappId } = params;
   const isButton = params.isButton !== false; // compat: default = botão
@@ -52,33 +112,64 @@ export async function handleCampaignButtonLead(params: {
   }
 
   try {
-    const raw = await GetCompanySetting(companyId, "campaignSellerButtons", "");
-    const triggers = String(raw || "")
-      .split(/[,;\n]/)
-      .map(norm)
-      .filter(Boolean);
-    const matched = triggers.includes(norm(btn));
-
-    logger.info(
-      `[Campanha][rodízio] AVALIANDO (ticket=${ticketId}) isButton=${isButton} texto="${btn}" gatilhosConfigurados=[${triggers.join(
-        "; "
-      )}] bateu=${matched}`
-    );
-
-    if (isButton) {
-      // Botão: lista vazia dispara qualquer um; preenchida, só os listados.
-      if (triggers.length && !matched) {
+    // 1) Configuração da PRÓPRIA campanha (quando identificada e configurada):
+    //    vale exatamente a lista dela — botão fora da lista segue para a IA/fila.
+    const { campaign, via } = await resolveCampaign({
+      companyId,
+      whatsappId,
+      contextId: params.contextId,
+      contactNumber: params.contactNumber
+    });
+    if (campaign && Array.isArray(campaign.sellerButtons)) {
+      const list = campaign.sellerButtons.map(norm).filter(Boolean);
+      const hit = list.includes(norm(btn));
+      logger.info(
+        `[Campanha][rodízio] AVALIANDO (ticket=${ticketId}) campanha=${campaign.id} "${campaign.name}" (via ${via}) isButton=${isButton} texto="${btn}" botõesDaCampanha=[${list.join(
+          "; "
+        )}] bateu=${hit}`
+      );
+      if (!hit) {
         logger.info(
-          `[Campanha][rodízio] IGNORADO (ticket=${ticketId}): botão "${btn}" não está na lista de gatilhos.`
+          `[Campanha][rodízio] IGNORADO (ticket=${ticketId}): "${btn}" não está marcado para o rodízio na campanha ${campaign.id}; segue o atendimento normal (IA/fila).`
         );
         return false;
       }
-    } else if (!matched) {
-      // Texto puro: só dispara se bater um gatilho configurado.
-      logger.info(
-        `[Campanha][rodízio] IGNORADO (ticket=${ticketId}): chegou como TEXTO e "${btn}" não bate com nenhum gatilho configurado. Preencha "campaignSellerButtons" com os rótulos dos botões.`
+    } else {
+      // 2) Configuração GERAL (Configurações → Opções).
+      const raw = await GetCompanySetting(
+        companyId,
+        "campaignSellerButtons",
+        ""
       );
-      return false;
+      const triggers = String(raw || "")
+        .split(/[,;\n]/)
+        .map(norm)
+        .filter(Boolean);
+      const matched = triggers.includes(norm(btn));
+
+      logger.info(
+        `[Campanha][rodízio] AVALIANDO (ticket=${ticketId}) campanha=${
+          campaign ? `${campaign.id} sem config própria` : "não identificada"
+        } isButton=${isButton} texto="${btn}" gatilhosGerais=[${triggers.join(
+          "; "
+        )}] bateu=${matched}`
+      );
+
+      if (isButton) {
+        // Botão: lista vazia dispara qualquer um; preenchida, só os listados.
+        if (triggers.length && !matched) {
+          logger.info(
+            `[Campanha][rodízio] IGNORADO (ticket=${ticketId}): botão "${btn}" não está na lista de gatilhos.`
+          );
+          return false;
+        }
+      } else if (!matched) {
+        // Texto puro: só dispara se bater um gatilho configurado.
+        logger.info(
+          `[Campanha][rodízio] IGNORADO (ticket=${ticketId}): chegou como TEXTO e "${btn}" não bate com nenhum gatilho configurado.`
+        );
+        return false;
+      }
     }
 
     // Pool de vendedores: 1) o da CONEXÃO onde a resposta chegou (roteamento

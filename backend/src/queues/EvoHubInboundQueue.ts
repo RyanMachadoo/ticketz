@@ -191,7 +191,9 @@ evoHubInboundQueue.process(async job => {
           ticketId: ticket.id,
           buttonText: body,
           whatsappId: whatsapp.id,
-          isButton: isButtonReply
+          isButton: isButtonReply,
+          contextId: msg.context?.id,
+          contactNumber: waId
         });
       }
 

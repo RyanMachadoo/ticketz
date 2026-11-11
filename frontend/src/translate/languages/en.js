@@ -1120,7 +1120,11 @@ const messages = {
             templateRequired:
               "Select an approved template to send on this official connection.",
             templateImageHint:
-              "If the template has an image header, attach the image to the campaign — it is sent in the template header."
+              "If the template has an image header, attach the image to the campaign — it is sent in the template header.",
+            sellerButtonsTitle: "When the button is tapped",
+            sellerButtonsHint:
+              "Checked: the lead goes straight to the next seller (connection rotation). Unchecked: the AI/queue handles it normally.",
+            sellerButtonsGoes: "goes straight to the seller rotation"
           },
           buttons: {
             add: "Add",
@@ -1482,6 +1486,12 @@ const messages = {
         transferMessage: {
           title: "Transfer Message",
           placeholder: "Enter your transfer message here"
+        },
+        campaignSellerButtons: {
+          title: "Campaign buttons that go straight to seller rotation",
+          placeholder: "E.g.: BUY NOW, TALK TO A SELLER",
+          helper:
+            "Comma separated. When the customer taps (or types) one of these buttons, the lead goes straight to the next seller. Empty: any campaign button triggers."
         },
         mustacheVariables: {
           title: "Available variables:"

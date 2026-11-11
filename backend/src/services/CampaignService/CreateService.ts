@@ -26,7 +26,14 @@ interface Data {
   templateName?: string;
   templateLanguage?: string;
   templateParams?: string[];
+  sellerButtons?: string[] | null;
 }
+
+/** Normaliza a lista de botões do rodízio: array de textos ou null. */
+const sanitizeSellerButtons = (v: any): string[] | null => {
+  if (!Array.isArray(v)) return null;
+  return v.map(x => String(x || "").trim()).filter(Boolean);
+};
 
 const CreateService = async (data: Data): Promise<Campaign> => {
   const { name } = data;
@@ -49,6 +56,8 @@ const CreateService = async (data: Data): Promise<Campaign> => {
   if (data.scheduledAt != null) {
     data.status = "PROGRAMADA";
   }
+
+  data.sellerButtons = sanitizeSellerButtons(data.sellerButtons);
 
   const record = await Campaign.create(data);
 
