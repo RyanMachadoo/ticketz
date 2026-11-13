@@ -237,6 +237,9 @@ const UpdateTicketService = async ({
 
           // Integrações (webhook de saída): ticket atualizado. Fire-and-forget.
           dispatchWebhookEvent(ticket.companyId, "ticket.updated", ticket);
+          if (oldStatus !== "closed") {
+            dispatchWebhookEvent(ticket.companyId, "ticket.closed", ticket);
+          }
 
           return { ticket, oldStatus, oldUserId };
         }
@@ -435,6 +438,9 @@ const UpdateTicketService = async ({
 
     // Integrações (webhook de saída): ticket atualizado. Fire-and-forget.
     dispatchWebhookEvent(ticket.companyId, "ticket.updated", ticket);
+    if (ticket.status === "closed" && oldStatus !== "closed") {
+      dispatchWebhookEvent(ticket.companyId, "ticket.closed", ticket);
+    }
 
     return { ticket, oldStatus, oldUserId };
   } catch (err) {

@@ -10,6 +10,7 @@ import { saveReferral } from "../services/CtwaServices/CtwaService";
 import { dispatchWebhookEvent } from "../services/WebhookServices/DispatchWebhook";
 import { handleCampaignButtonLead } from "../services/CampaignService/HandleCampaignButtonLead";
 import { handleSurveyReply } from "../services/AutomationServices/HandleSurveyReplyService";
+import { dispatchMessageStatus } from "../services/WebhookServices/DispatchMessageStatus";
 
 /**
  * Processa em background os eventos recebidos do EvoHub (Cloud API oficial).
@@ -224,7 +225,27 @@ evoHubInboundQueue.process(async job => {
     // 2) STATUS de mensagens enviadas (sent/delivered/read/failed) -> ack
     for (const st of value.statuses || []) {
       const ack = ACK_MAP[st.status] ?? 0;
-      await Message.update({ ack }, { where: { id: st.id } });
+      // Não regride o status (ex.: "delivered" chegando depois de "read").
+      const current = await Message.findByPk(st.id, {
+        attributes: ["id", "ack"]
+      });
+      const regress =
+        !!current && st.status !== "failed" && (current.ack ?? 0) >= ack;
+      if (!regress) {
+        await Message.update({ ack }, { where: { id: st.id } });
+      }
+
+      // Webhook de saída: mensagem entregue / lida / falhou.
+      if (
+        current &&
+        !regress &&
+        ["delivered", "read", "failed"].includes(st.status)
+      ) {
+        dispatchMessageStatus(companyId, st.id, st.status, {
+          whatsappId: whatsapp.id,
+          error: st.status === "failed" ? st.errors || null : null
+        });
+      }
 
       // Auditoria de campanha: atualiza o disparo correspondente (por wamid)
       // com o status real da Meta e a data/hora do evento. Best-effort.

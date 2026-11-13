@@ -44,6 +44,7 @@ import formatBody from "../../helpers/Mustache";
 import TicketTraking from "../../models/TicketTraking";
 import UserRating from "../../models/UserRating";
 import SendWhatsAppMessage from "./SendWhatsAppMessage";
+import { dispatchMessageStatus } from "../WebhookServices/DispatchMessageStatus";
 import Queue from "../../models/Queue";
 import QueueOption from "../../models/QueueOption";
 import VerifyCurrentSchedule, {
@@ -2137,6 +2138,24 @@ const handleMsgAck = async (
         message: messageToUpdate
       }
     );
+
+    // Webhook de saída: mensagem entregue / lida / falhou (só as enviadas).
+    if (messageToUpdate.fromMe) {
+      let webhookStatus: "delivered" | "read" | "failed" | null = null;
+      if (error) webhookStatus = "failed";
+      else if (update.status >= WAMessageStatus.READ) webhookStatus = "read";
+      else if (update.status === WAMessageStatus.DELIVERY_ACK) {
+        webhookStatus = "delivered";
+      }
+      if (webhookStatus) {
+        dispatchMessageStatus(
+          messageToUpdate.companyId,
+          messageToUpdate,
+          webhookStatus,
+          { whatsappId, error: error || null }
+        );
+      }
+    }
   } catch (err) {
     Sentry.captureException(err);
     logger.error(`Error handling message ack. Err: ${err}`);

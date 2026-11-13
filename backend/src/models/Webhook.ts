@@ -40,6 +40,19 @@ class Webhook extends Model<Webhook> {
   @Column(DataType.JSONB)
   whatsappIds: number[] | null;
 
+  // Última entrega (diagnóstico na tela de Integrações).
+  @Column
+  lastDeliveryAt: Date;
+
+  @Column(DataType.TEXT)
+  lastDeliveryEvent: string;
+
+  @Column(DataType.TEXT)
+  lastDeliveryStatus: string;
+
+  @Column
+  lastDeliveryOk: boolean;
+
   @Column(DataType.TEXT)
   secret: string;
 

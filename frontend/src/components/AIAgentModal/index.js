@@ -536,6 +536,7 @@ const AIAgentModal = ({ open, onClose, agentId }) => {
       {tool.kind === "webhook" && (
         <TextField
           label={i18n.t("aiAgents.modal.event")}
+          helperText={i18n.t("aiAgents.modal.eventHint")}
           value={tool.event || ""}
           onChange={e => updateTool(idx, { event: e.target.value })}
           fullWidth

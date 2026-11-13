@@ -401,6 +401,8 @@ const messages = {
           toolDesc: "Description",
           toolDescHint: "Explain when and why the agent should use this tool.",
           event: "Webhook event",
+          eventHint:
+            "Start with agent. (e.g. agent.qualified_lead). In Integrations, the webhook must have the “AI agent webhook tool” event checked.",
           method: "Method",
           url: "URL",
           urlHint: "You can use {{param}}, {{contact.name}}, {{contact.number}}.",
@@ -526,6 +528,9 @@ const messages = {
         statusActive: "Active",
         statusInactive: "Inactive",
         allConnections: "All",
+        deliveryOk: "OK",
+        deliveryFail: "Failed",
+        neverDelivered: "No deliveries yet",
         confirmDeleteTitle: "Delete webhook",
         confirmDeleteMessage:
           "Are you sure? ticketz will stop sending events to this URL.",
@@ -534,6 +539,7 @@ const messages = {
           url: "URL",
           events: "Events",
           connections: "Connections",
+          lastDelivery: "Last delivery",
           active: "Active",
           actions: "Actions"
         },
@@ -546,6 +552,8 @@ const messages = {
           secretHelper:
             "If set, the body is signed with HMAC-SHA256 in the X-Ticketz-Signature header.",
           events: "Events that trigger this webhook",
+          checkAll: "Check all",
+          uncheckAll: "Uncheck all",
           connections: "Connections that trigger this webhook",
           connectionsHint:
             "None checked = all connections. Check to receive events only from the selected connections.",
@@ -556,10 +564,16 @@ const messages = {
         },
         eventLabels: {
           messageReceived: "Message received (contact)",
-          messageSent: "Message sent (agent)",
+          messageSent: "Message sent (agent, AI or campaign)",
           ticketCreated: "Ticket created",
           ticketUpdated: "Ticket updated (status/queue)",
-          ctwaLead: "Ad lead (Click-to-WhatsApp)"
+          ctwaLead: "Ad lead (Click-to-WhatsApp)",
+          messageDelivered: "Message delivered to customer",
+          messageRead: "Message read by customer",
+          messageFailed: "Message failed to send",
+          ticketClosed: "Ticket closed",
+          leadHandoff: "Lead sent to seller (rotation)",
+          agentCustom: "AI agent webhook tool (agent.*)"
         },
         toasts: {
           success: "Webhook saved successfully.",

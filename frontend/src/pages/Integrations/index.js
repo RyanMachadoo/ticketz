@@ -119,6 +119,7 @@ const Integrations = () => {
     } catch (err) {
       toastError(err);
     }
+    fetchWebhooks(); // atualiza a coluna "Última entrega"
   };
 
   return (
@@ -167,6 +168,7 @@ const Integrations = () => {
                 {i18n.t("integrations.table.events")}
               </TableCell>
               <TableCell>{i18n.t("integrations.table.connections")}</TableCell>
+              <TableCell>{i18n.t("integrations.table.lastDelivery")}</TableCell>
               <TableCell align="center">
                 {i18n.t("integrations.table.active")}
               </TableCell>
@@ -177,10 +179,10 @@ const Integrations = () => {
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRowSkeleton columns={6} />
+              <TableRowSkeleton columns={7} />
             ) : webhooks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography color="textSecondary">
                     {i18n.t("integrations.empty")}
                   </Typography>
@@ -197,6 +199,39 @@ const Integrations = () => {
                     {(w.events || []).length}
                   </TableCell>
                   <TableCell>{connectionsLabel(w)}</TableCell>
+                  <TableCell>
+                    {w.lastDeliveryAt ? (
+                      <>
+                        <Chip
+                          size="small"
+                          style={{
+                            backgroundColor: w.lastDeliveryOk
+                              ? "#2e7d32"
+                              : "#c62828",
+                            color: "#fff",
+                            marginRight: 6
+                          }}
+                          label={
+                            w.lastDeliveryOk
+                              ? i18n.t("integrations.deliveryOk")
+                              : i18n.t("integrations.deliveryFail")
+                          }
+                        />
+                        <Typography
+                          variant="caption"
+                          title={w.lastDeliveryStatus || ""}
+                        >
+                          {`${new Date(w.lastDeliveryAt).toLocaleString()} · ${
+                            w.lastDeliveryEvent || ""
+                          } · ${w.lastDeliveryStatus || ""}`}
+                        </Typography>
+                      </>
+                    ) : (
+                      <Typography variant="caption" color="textSecondary">
+                        {i18n.t("integrations.neverDelivered")}
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell align="center">
                     <Chip
                       size="small"

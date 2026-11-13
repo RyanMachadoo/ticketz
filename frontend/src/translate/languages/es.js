@@ -401,6 +401,8 @@ const messages = {
           toolDescHint:
             "Explique cuándo y para qué el agente debe usar esta herramienta.",
           event: "Evento del webhook",
+          eventHint:
+            "Empiece con agent. (ej.: agent.lead_calificado). En Integraciones, el webhook debe tener marcado el evento “Herramienta webhook del agente de IA”.",
           method: "Método",
           url: "URL",
           urlHint: "Puede usar {{parametro}}, {{contact.name}}, {{contact.number}}.",
@@ -527,6 +529,9 @@ const messages = {
         statusActive: "Activo",
         statusInactive: "Inactivo",
         allConnections: "Todas",
+        deliveryOk: "OK",
+        deliveryFail: "Falla",
+        neverDelivered: "Ninguna entrega aún",
         confirmDeleteTitle: "Eliminar webhook",
         confirmDeleteMessage:
           "¿Seguro? ticketz dejará de enviar eventos a esta URL.",
@@ -535,6 +540,7 @@ const messages = {
           url: "URL",
           events: "Eventos",
           connections: "Conexiones",
+          lastDelivery: "Última entrega",
           active: "Activo",
           actions: "Acciones"
         },
@@ -547,6 +553,8 @@ const messages = {
           secretHelper:
             "Si se completa, el cuerpo se firma con HMAC-SHA256 en el header X-Ticketz-Signature.",
           events: "Eventos que disparan este webhook",
+          checkAll: "Marcar todos",
+          uncheckAll: "Desmarcar todos",
           connections: "Conexiones que disparan este webhook",
           connectionsHint:
             "Ninguna marcada = todas las conexiones. Marque para recibir eventos solo de las conexiones elegidas.",
@@ -557,10 +565,16 @@ const messages = {
         },
         eventLabels: {
           messageReceived: "Mensaje recibido (contacto)",
-          messageSent: "Mensaje enviado (agente)",
+          messageSent: "Mensaje enviado (agente, IA o campaña)",
           ticketCreated: "Ticket creado",
           ticketUpdated: "Ticket actualizado (estado/cola)",
-          ctwaLead: "Lead de anuncio (Click-to-WhatsApp)"
+          ctwaLead: "Lead de anuncio (Click-to-WhatsApp)",
+          messageDelivered: "Mensaje entregado al cliente",
+          messageRead: "Mensaje leído por el cliente",
+          messageFailed: "Falla en el envío del mensaje",
+          ticketClosed: "Ticket finalizado",
+          leadHandoff: "Lead enviado al vendedor (rotación)",
+          agentCustom: "Herramienta webhook del agente de IA (agent.*)"
         },
         toasts: {
           success: "Webhook guardado con éxito.",

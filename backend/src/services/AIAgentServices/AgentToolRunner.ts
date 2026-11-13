@@ -464,15 +464,25 @@ export async function executeTool(
       } catch (e) {
         // best-effort
       }
-      await dispatchWebhookEvent(ctx.companyId, event as any, {
+      const delivered = await dispatchWebhookEvent(ctx.companyId, event, {
         source: "ai-agent",
         whatsappId: toolWhatsappId,
         ticketId: ctx.ticketId,
         contact: { name: ctx.contactName, number: ctx.contactNumber },
         input
       });
+      if (!delivered) {
+        logger.warn(
+          `[Agente IA] ferramenta webhook '${def.name}' (evento '${event}', ticket=${ctx.ticketId}) NÃO entregue: nenhum webhook ativo recebeu. Em Integrações, marque o evento "Ferramenta webhook do agente de IA" e confira a conexão.`
+        );
+        return {
+          content:
+            "Não foi possível registrar a solicitação agora. Diga ao cliente que você vai verificar e, se necessário, transfira para um humano.",
+          isError: true
+        };
+      }
       return {
-        content: "Webhook disparado com sucesso.",
+        content: "Solicitação registrada com sucesso.",
         isError: false
       };
     }
@@ -679,6 +689,22 @@ export async function transferTicketToHuman(params: {
     preference: sellerPreference,
     whatsappId: ticket.whatsappId || fullTicket?.whatsappId
   });
+
+  // Webhook de saída: lead enviado ao vendedor do rodízio (IA ou campanha).
+  if (seller) {
+    dispatchWebhookEvent(companyId, "lead.handoff", {
+      whatsappId: ticket.whatsappId || fullTicket?.whatsappId || null,
+      ticketId,
+      contact: {
+        name: fullTicket?.contact?.name || "",
+        number: fullTicket?.contact?.number || ""
+      },
+      seller: seller.sellerName,
+      viaPreference: !!seller.viaPreference,
+      motivo: motivo || null,
+      targetQueueId
+    });
+  }
 
   logger.info(
     `[Agente IA] TRANSFERIDO ticket=${ticketId} -> fila=${

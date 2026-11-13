@@ -173,9 +173,9 @@ export const test = async (req: Request, res: Response): Promise<Response> => {
 
   // Teste vai SÓ para este webhook (antes ia para todos que assinavam o evento).
   const bound = Array.isArray(webhook.whatsappIds) ? webhook.whatsappIds : [];
-  await dispatchWebhookEvent(
+  const delivered = await dispatchWebhookEvent(
     companyId,
-    event as any,
+    event,
     {
       test: true,
       message: "Webhook de teste do ticketz",
@@ -184,5 +184,12 @@ export const test = async (req: Request, res: Response): Promise<Response> => {
     { onlyWebhookId: webhook.id, whatsappId: bound[0] || null }
   );
 
-  return res.status(200).json({ message: "Test event dispatched" });
+  if (!delivered) {
+    throw new AppError(
+      "Falha no teste: a URL do webhook não respondeu com sucesso. Confira a URL (no n8n use a Production URL com o workflow ativo) e veja o log [Webhook] do backend.",
+      400
+    );
+  }
+
+  return res.status(200).json({ message: "Test event dispatched", delivered });
 };

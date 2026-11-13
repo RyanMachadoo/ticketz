@@ -46,9 +46,15 @@ const useStyles = makeStyles(theme => ({
 export const WEBHOOK_EVENTS = [
   { value: "message.received", labelKey: "messageReceived" },
   { value: "message.sent", labelKey: "messageSent" },
+  { value: "message.delivered", labelKey: "messageDelivered" },
+  { value: "message.read", labelKey: "messageRead" },
+  { value: "message.failed", labelKey: "messageFailed" },
   { value: "ticket.created", labelKey: "ticketCreated" },
   { value: "ticket.updated", labelKey: "ticketUpdated" },
-  { value: "ctwa.lead", labelKey: "ctwaLead" }
+  { value: "ticket.closed", labelKey: "ticketClosed" },
+  { value: "ctwa.lead", labelKey: "ctwaLead" },
+  { value: "lead.handoff", labelKey: "leadHandoff" },
+  { value: "agent.custom", labelKey: "agentCustom" }
 ];
 
 const WebhookSchema = Yup.object().shape({
@@ -187,6 +193,22 @@ const WebhookModal = ({ open, onClose, webhookId }) => {
                 >
                   {i18n.t("integrations.modal.events")}
                 </Typography>
+                <Button
+                  size="small"
+                  color="primary"
+                  onClick={() =>
+                    setFieldValue(
+                      "events",
+                      values.events.length === WEBHOOK_EVENTS.length
+                        ? []
+                        : WEBHOOK_EVENTS.map(ev => ev.value)
+                    )
+                  }
+                >
+                  {values.events.length === WEBHOOK_EVENTS.length
+                    ? i18n.t("integrations.modal.uncheckAll")
+                    : i18n.t("integrations.modal.checkAll")}
+                </Button>
                 <FormGroup>
                   {WEBHOOK_EVENTS.map(ev => (
                     <FormControlLabel
