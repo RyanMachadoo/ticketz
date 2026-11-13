@@ -54,11 +54,21 @@ const Integrations = () => {
   const classes = useStyles();
 
   const [webhooks, setWebhooks] = useState([]);
+  const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  // Nomes das conexões vinculadas ao webhook ("Todas" quando sem vínculo).
+  const connectionsLabel = w => {
+    const ids = Array.isArray(w.whatsappIds) ? w.whatsappIds : [];
+    if (!ids.length) return i18n.t("integrations.allConnections");
+    return ids
+      .map(id => connections.find(c => c.id === id)?.name || `#${id}`)
+      .join(", ");
+  };
 
   const fetchWebhooks = async () => {
     setLoading(true);
@@ -74,6 +84,10 @@ const Integrations = () => {
 
   useEffect(() => {
     fetchWebhooks();
+    api
+      .get("/whatsapp", { params: { session: 0 } })
+      .then(({ data }) => setConnections(Array.isArray(data) ? data : []))
+      .catch(() => setConnections([]));
   }, []);
 
   const handleOpenModal = (id = null) => {
@@ -152,6 +166,7 @@ const Integrations = () => {
               <TableCell align="center">
                 {i18n.t("integrations.table.events")}
               </TableCell>
+              <TableCell>{i18n.t("integrations.table.connections")}</TableCell>
               <TableCell align="center">
                 {i18n.t("integrations.table.active")}
               </TableCell>
@@ -162,10 +177,10 @@ const Integrations = () => {
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRowSkeleton columns={5} />
+              <TableRowSkeleton columns={6} />
             ) : webhooks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={6} align="center">
                   <Typography color="textSecondary">
                     {i18n.t("integrations.empty")}
                   </Typography>
@@ -181,6 +196,7 @@ const Integrations = () => {
                   <TableCell align="center">
                     {(w.events || []).length}
                   </TableCell>
+                  <TableCell>{connectionsLabel(w)}</TableCell>
                   <TableCell align="center">
                     <Chip
                       size="small"

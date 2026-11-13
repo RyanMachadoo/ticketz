@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as Yup from "yup";
 import AppError from "../errors/AppError";
 import Webhook from "../models/Webhook";
+import Whatsapp from "../models/Whatsapp";
 import {
   dispatchWebhookEvent,
   WEBHOOK_EVENTS
@@ -23,7 +24,29 @@ interface WebhookData {
   events?: string[];
   secret?: string;
   active?: boolean;
+  whatsappIds?: number[] | null;
 }
+
+/**
+ * Conexões vinculadas: só ids de conexões da própria empresa.
+ * Lista vazia/ausente = null (webhook vale para todas as conexões).
+ */
+const sanitizeWhatsappIds = async (
+  ids: any,
+  companyId: number
+): Promise<number[] | null> => {
+  if (!Array.isArray(ids)) return null;
+  const wanted = Array.from(
+    new Set(ids.map(Number).filter(n => Number.isInteger(n) && n > 0))
+  );
+  if (!wanted.length) return null;
+  const found = await Whatsapp.findAll({
+    where: { id: wanted, companyId },
+    attributes: ["id"]
+  });
+  const valid = found.map(w => w.id);
+  return valid.length ? valid : null;
+};
 
 const sanitizeEvents = (events?: string[]): string[] => {
   if (!Array.isArray(events)) return [];
@@ -61,6 +84,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     events: sanitizeEvents(data.events),
     secret: data.secret || null,
     active: data.active !== undefined ? data.active : true,
+    whatsappIds: await sanitizeWhatsappIds(data.whatsappIds, companyId),
     companyId
   });
 
@@ -107,7 +131,11 @@ export const update = async (req: Request, res: Response): Promise<Response> => 
     events:
       data.events !== undefined ? sanitizeEvents(data.events) : webhook.events,
     secret: data.secret !== undefined ? data.secret || null : webhook.secret,
-    active: data.active !== undefined ? data.active : webhook.active
+    active: data.active !== undefined ? data.active : webhook.active,
+    whatsappIds:
+      data.whatsappIds !== undefined
+        ? await sanitizeWhatsappIds(data.whatsappIds, companyId)
+        : webhook.whatsappIds
   });
 
   return res.status(200).json(webhook);
@@ -143,11 +171,18 @@ export const test = async (req: Request, res: Response): Promise<Response> => {
 
   const event = (webhook.events && webhook.events[0]) || "message.received";
 
-  await dispatchWebhookEvent(companyId, event as any, {
-    test: true,
-    message: "Webhook de teste do ticketz",
-    webhookId: webhook.id
-  });
+  // Teste vai SÓ para este webhook (antes ia para todos que assinavam o evento).
+  const bound = Array.isArray(webhook.whatsappIds) ? webhook.whatsappIds : [];
+  await dispatchWebhookEvent(
+    companyId,
+    event as any,
+    {
+      test: true,
+      message: "Webhook de teste do ticketz",
+      webhookId: webhook.id
+    },
+    { onlyWebhookId: webhook.id, whatsappId: bound[0] || null }
+  );
 
   return res.status(200).json({ message: "Test event dispatched" });
 };

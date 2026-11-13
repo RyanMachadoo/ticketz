@@ -35,6 +35,11 @@ class Webhook extends Model<Webhook> {
   @Column(DataType.JSON)
   events: string[];
 
+  // Conexões (ids de Whatsapps) que disparam este webhook.
+  // null ou [] = todas as conexões.
+  @Column(DataType.JSONB)
+  whatsappIds: number[] | null;
+
   @Column(DataType.TEXT)
   secret: string;
 

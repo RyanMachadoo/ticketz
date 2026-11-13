@@ -212,6 +212,7 @@ evoHubInboundQueue.process(async job => {
             `[CTWA] lead do anúncio ${msg.referral.source_id || "?"} (ticket=${ticket.id})`
           );
           dispatchWebhookEvent(companyId, "ctwa.lead", {
+            whatsappId: whatsapp.id,
             ticketId: ticket.id,
             contact: { id: contact.id, name: contact.name, number: contact.number },
             referral: msg.referral

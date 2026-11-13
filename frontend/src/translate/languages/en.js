@@ -525,6 +525,7 @@ const messages = {
         test: "Send test event",
         statusActive: "Active",
         statusInactive: "Inactive",
+        allConnections: "All",
         confirmDeleteTitle: "Delete webhook",
         confirmDeleteMessage:
           "Are you sure? ticketz will stop sending events to this URL.",
@@ -532,6 +533,7 @@ const messages = {
           name: "Name",
           url: "URL",
           events: "Events",
+          connections: "Connections",
           active: "Active",
           actions: "Actions"
         },
@@ -544,6 +546,9 @@ const messages = {
           secretHelper:
             "If set, the body is signed with HMAC-SHA256 in the X-Ticketz-Signature header.",
           events: "Events that trigger this webhook",
+          connections: "Connections that trigger this webhook",
+          connectionsHint:
+            "None checked = all connections. Check to receive events only from the selected connections.",
           active: "Active",
           cancel: "Cancel",
           saveAdd: "Add",

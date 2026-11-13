@@ -454,8 +454,19 @@ export async function executeTool(
   try {
     if (def.kind === "webhook") {
       const event = def.event || "agent.custom";
+      // Conexão do ticket: respeita o vínculo webhook -> conexão.
+      let toolWhatsappId: number | null = null;
+      try {
+        const t = await Ticket.findByPk(ctx.ticketId, {
+          attributes: ["id", "whatsappId"]
+        });
+        toolWhatsappId = t?.whatsappId || null;
+      } catch (e) {
+        // best-effort
+      }
       await dispatchWebhookEvent(ctx.companyId, event as any, {
         source: "ai-agent",
+        whatsappId: toolWhatsappId,
         ticketId: ctx.ticketId,
         contact: { name: ctx.contactName, number: ctx.contactNumber },
         input

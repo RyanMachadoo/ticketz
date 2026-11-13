@@ -63,9 +63,20 @@ const WebhookModal = ({ open, onClose, webhookId }) => {
     url: "",
     secret: "",
     active: true,
-    events: []
+    events: [],
+    whatsappIds: []
   };
   const [webhook, setWebhook] = useState(initialState);
+  const [connections, setConnections] = useState([]);
+
+  // Conexões disponíveis para vincular o webhook.
+  useEffect(() => {
+    if (!open) return;
+    api
+      .get("/whatsapp", { params: { session: 0 } })
+      .then(({ data }) => setConnections(Array.isArray(data) ? data : []))
+      .catch(() => setConnections([]));
+  }, [open]);
 
   useEffect(() => {
     const fetchWebhook = async () => {
@@ -79,7 +90,8 @@ const WebhookModal = ({ open, onClose, webhookId }) => {
           ...prev,
           ...data,
           secret: data.secret || "",
-          events: Array.isArray(data.events) ? data.events : []
+          events: Array.isArray(data.events) ? data.events : [],
+          whatsappIds: Array.isArray(data.whatsappIds) ? data.whatsappIds : []
         }));
       } catch (err) {
         toastError(err);
@@ -192,6 +204,41 @@ const WebhookModal = ({ open, onClose, webhookId }) => {
                         />
                       }
                       label={i18n.t(`integrations.eventLabels.${ev.labelKey}`)}
+                    />
+                  ))}
+                </FormGroup>
+
+                <Typography
+                  variant="subtitle2"
+                  style={{ marginTop: 12, marginBottom: 0 }}
+                >
+                  {i18n.t("integrations.modal.connections")}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  display="block"
+                >
+                  {i18n.t("integrations.modal.connectionsHint")}
+                </Typography>
+                <FormGroup>
+                  {connections.map(conn => (
+                    <FormControlLabel
+                      key={`conn-${conn.id}`}
+                      control={
+                        <Checkbox
+                          color="primary"
+                          checked={(values.whatsappIds || []).includes(conn.id)}
+                          onChange={e => {
+                            const current = values.whatsappIds || [];
+                            const next = e.target.checked
+                              ? [...current, conn.id]
+                              : current.filter(x => x !== conn.id);
+                            setFieldValue("whatsappIds", next);
+                          }}
+                        />
+                      }
+                      label={conn.name}
                     />
                   ))}
                 </FormGroup>
